@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeMind - Patient Profile</title>
+    <link rel="stylesheet" href="stylesheet.css">
+</head>
+
+<body class="dashboard-page">
+    <header class="dashboard-header">
+        <div class="header-left">
+            <img src="images/logo.png" alt="SafeMind Logo" class="dashboard-logo">
+        </div>
+        <div class="header-right">
+            <div class="user-avatar">
+                <ion-icon name="person-circle"></ion-icon>
+            </div>
+        </div>
+    </header>
+
+    <nav class="dashboard-sidebar">
+        <div class="sidebar-header">
+            <button class="hamburger-menu">
+                <ion-icon name="menu"></ion-icon>
+            </button>
+        </div>
+        <ul class="sidebar-nav">
+            <li class="nav-item hidden"><a href="index.html">Home</a></li>
+            <li class="nav-item hidden"><a href="about.html">About Us</a></li>
+            <li><a href="dashboard.html" class="active">Dashboard</a></li>
+            <li><a href="calendar.html">Calendar</a></li>
+        </ul>
+    </nav>
+
+    <main class="dashboard-main">
+        <div class="patient-profile-content">
+            <div class="profile-header">
+                <a href="dashboard.html" class="back-link">
+                    <ion-icon name="chevron-back"></ion-icon>
+                    Patient's Profile
+                </a>
+            </div>
+            
+            <div class="patient-info">
+                <h2 id="patient-name">Nat Jalando-on /M</h2>
+                <p id="patient-age">18 yrs Old</p>
+                <p id="patient-location">Tarlac City</p>
+            </div>
+            
+            <div class="severity-gauge-container">
+                <div class="gauge-wrapper">
+                    <div class="gauge-icon icon-happy">😊</div>
+                    <div class="gauge-icon icon-neutral">😐</div>
+                    <div class="gauge-icon icon-sad">😢</div>
+                    
+                    <div class="gauge-arc"></div>
+                    
+                    <div class="gauge-mask"></div>
+                    
+                    <div class="gauge-needle" id="gauge-needle"></div>
+                    <div class="gauge-pivot"></div>
+                </div>
+                
+                <div class="severity-percentage">
+                    <span id="severity-value">92%</span>
+                </div>
+                
+                <div class="severity-description">
+                    <p>Based on SafeMind's analysis, the level of severity of the patient's depression is <strong id="severity-text">92%</strong>, which indicates a <strong>severe</strong> level of depression.</p>
+                </div>
+            </div>
+            
+            <div class="profile-actions">
+                <a href="#" class="view-report-link">View Full Report</a>
+            </div>
+        </div>
+    </main>
+
+    <script src="script.js" defer></script>
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</body>
+
+</html>

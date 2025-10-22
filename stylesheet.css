@@ -1,0 +1,974 @@
+/* Reset and base typography */
+*{
+    margin:0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Page background and overflow handling */
+body{
+    min-height: 100vh;
+    background: url('images/background.png')no-repeat;
+    background-size: cover;
+    background-position: center;
+    overflow-x: hidden; 
+}
+
+/* Dim overlay when login modal is active */
+body.login-active::before{
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    pointer-events: none;
+    z-index: 100; /* below modal, above content */
+}
+
+/* Keep hero above overlay when login is active */
+body.login-active .left-container{ z-index: 101; }
+
+/* Fixed header */
+header{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 15px 100px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 101;
+    height: 80px;
+}
+
+/* Logo sizing */
+.logo{
+    font-size: 2em;
+    color: #fff;
+    user-select: none;
+    height: 250px;
+    width: auto;
+}
+
+/* Top navigation layout */
+.navigation {
+    display: flex;
+    align-items: center;
+}
+
+.navigation a {
+    position: relative;
+    font-size: 1.1em;
+    color: #fff;
+    text-decoration:none;
+    font-weight: 500;
+    margin-left: 40px;
+}
+
+/* Link underline animation */
+.navigation a::after{
+    content:'';
+    position: absolute;
+    left:0;
+    bottom: -6px;
+    width: 100%;
+    height: 3px;
+    background: #fff;
+    border-radius: 5px;
+    transform-origin: right;
+    transform: scaleX(0);
+    transition: transform .5s;
+}
+.navigation a:hover::after{
+    transform: scaleX(1);
+    transform-origin: left;
+}
+
+/* Login button in nav */
+.navigation .btnLogin-popup{
+    width: 130px;
+    height: 50px;
+    background:transparent;
+    border: 2px solid #fff;
+    outline: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.1em;
+    color: #fff;
+    font-weight: 500;
+    margin-left: 40px;
+    transition: .5s ease;
+}
+.navigation .btnLogin-popup:hover{
+    background:#fff;
+    color:#162938;
+}
+
+/* Centered hero container */
+.left-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%; 
+    max-width: 800px; 
+    text-align: center;
+    transition: all .7s ease; 
+    z-index: 1;
+    padding: 80px 15px 0 15px; 
+}
+
+/* Hero content width control */
+.content{
+    max-width: 40rem;
+    display: inline-block;
+}
+
+/* Main hero title */
+.content h1{
+    font-size: clamp(3rem, 8vw, 7rem);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    margin: 2rem 0;
+    line-height: 0.8;
+    text-shadow: 0 0 10px rgba(128, 128, 128, 0.418);
+    color: #fff;
+    white-space: nowrap;
+    word-break: normal; 
+}
+.content h1:hover{
+    color:#07960e
+}
+
+/* Hero description */
+.description {
+    font-size: clamp(0.9rem, 2vw, 1.2rem); 
+    letter-spacing: 0.2em; 
+    max-width: 35rem;
+    color: #eee; 
+}
+
+/* Login/register modal wrapper (hidden by default) */
+.wrapper{
+    position: absolute;
+    top: 50%;
+    right: 5%;
+    width: 440px;
+    height: 550px;
+    background: transparent;
+    border: 2px solid rgba(255, 255, 255, .5);
+    border-radius: 20px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 0 30px rgba(0, 0, 0, .5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    transform: translateY(-50%) scale(0);
+    transform-origin: center;
+    transition: all .5s ease;
+    z-index: 102;
+}
+
+/* Active modal styling */
+.wrapper.active-popup{
+    transform: translateY(-50%) scale(1);
+    background: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+.wrapper.active{
+    height: 540px;
+}
+
+/* Form box positioning and transitions */
+.wrapper .form-box {
+    width: 100%;
+    padding: 40px;
+}
+.wrapper .form-box.login{
+    transition: transform .18s ease;
+    transform: translateX(0);
+}
+.wrapper.active .form-box.login{
+    transition: none;
+    transform: translate(-500px);
+}
+.wrapper .form-box.register {
+    position: absolute;
+    transition: none;
+    transform: translateX(500px);
+}
+.wrapper.active .form-box.register{
+    transition: transform .18s ease;
+    transform: translateX(0);
+}
+
+/* Modal close icon */
+.wrapper .icon-close{
+    position: absolute;
+    top:0;
+    right:0;
+    width:45px;
+    height: 45px;
+    background: #fff;
+    font-size: 2em;
+    color:black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-bottom-left-radius: 20px;
+    cursor: pointer;
+    z-index: 1;
+}
+
+/* Form headings */
+.form-box h2{
+    font-size: 2em;
+    color:#162938;
+    text-align: center;
+}
+
+/* Input container with floating label */
+.input-box{
+    position: relative;
+    width: 100%;
+    height: 50px;
+    border-bottom: 2px solid #162938;
+    margin: 30px 0;
+}
+.input-box label {
+    position: absolute;
+    top:50%;
+    left: 5px;
+    transform: translateY(-50%);
+    font-size: 1em;
+    color: #162938;
+    pointer-events: none;
+    transition: .5s;
+    font-weight: 600;
+    padding: 0 35px 0 5px;
+}
+.input-box input:focus~label,
+.input-box input:valid~label {
+    top: -5px;
+}
+.input-box input{
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #162938;
+    font-size: 1em;
+    padding: 0 35px 0 5px; 
+}
+.input-box .icon{
+    position: absolute;
+    right:8px;
+    color: #162938;
+    font-size: 1.2em;
+    line-height: 57px; 
+}
+
+/* Remember/forgot links layout */
+.remember-forgot{
+    font-size: .9em;
+    color: #162938;
+    font-weight: 500;
+    margin: -15px 0 15px;
+    display:flex;
+    justify-content: space-between;
+}
+.remember-forgot label input{
+    accent-color: #162938;
+    margin-right: 3px;
+}
+.remember-forgot a{
+    color: #162938;
+    text-decoration: none;
+}
+.remember-forgot a:hover{
+    text-decoration: underline;
+}
+
+/* Primary button style */
+.btn{
+    width: 100%;
+    height: 45px;
+    background: #07960e;
+    border: none;
+    outline: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1em;
+    color: #fff;
+    font-weight: 500;
+}
+
+/* Switch between login/register */
+.login-register {
+    font-size: .9em;
+    color: #162938;
+    text-align: center;
+    font-weight: 500;
+    margin: 25px 0 10px;
+}
+.login-register p a{
+    color: #162938;
+    text-decoration: none;
+    font-weight: 600;
+}
+.login-register p a:hover{
+    text-decoration: underline;
+}
+
+/* Responsive layout adjustments */
+@media screen and (max-width: 992px) {
+    header {
+        padding: 15px 5%;
+    }
+    .logo {
+        height: 180px; 
+    }
+    .navigation a {
+        margin-left: 20px;
+    }
+    .navigation .btnLogin-popup {
+        width: 100px;
+        height: 40px;
+        font-size: 1em;
+    }
+    body.login-active .left-container {
+        left: 50%;
+        width: 100%; 
+        transform: translate(-50%, -50%);
+        text-align: center;
+        padding-right: 15px;
+    }
+    .wrapper {
+        width: 90vw;
+        max-width: 400px;
+        right: 50%;
+        transform: translate(50%, -50%) scale(0);
+    }
+    .wrapper.active-popup {
+        transform: translate(50%, -50%) scale(1);
+    }
+}
+
+/* Medium screens: shift hero when login modal active */
+@media screen and (min-width: 993px) and (max-width: 1599px) {
+    body.login-active .left-container {
+        left: 35%;
+        transform: translate(-50%, -50%);
+        text-align: left;
+    }
+}
+
+/* Large screens: more left shift when login active */
+@media screen and (min-width: 1600px) {
+    body.login-active .left-container {
+        left: 20%;
+        transform: translate(-50%, -50%);
+        text-align: left;
+    }
+}
+
+/* Extra small screen adjustments */
+@media screen and (max-width: 576px) {
+    header {
+        flex-direction: column;
+        height: auto;
+        padding: 10px 5%;
+    }
+    .logo {
+        height: 150px;
+        margin-bottom: 10px;
+    }
+    .navigation {
+        width: 100%;
+        justify-content: center;
+    }
+    .navigation a {
+        margin: 0 10px;
+    }
+    .navigation .btnLogin-popup {
+        margin-left: 15px;
+    }
+}
+
+/* Prevent hero interactions on home while modal open */
+body.home-page.login-active .left-container{
+    z-index: 101;
+    pointer-events: none;
+}
+
+/* About page: active nav indicator */
+.navigation a.active-link::after {
+    transform: scaleX(1);
+    transform-origin: left;
+}
+
+/* About page: cards container */
+.content-container {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    gap: 30px;
+    padding: 120px 5% 40px;
+    flex-wrap: wrap;
+}
+
+/* About page: individual card styles */
+.card {
+    background: rgba(0, 0, 0, 0.2);
+    border: 2px solid rgba(255, 255, 255, .5);
+    border-radius: 20px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 0 30px rgba(0, 0, 0, .5);
+    padding: 30px;
+    color: #fff;
+    text-align: center;
+    flex: 1 1 320px;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.card img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    object-fit: cover;
+    max-height: 180px;
+}
+.card h2 {
+    font-size: 1.8em;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+.card p {
+    font-size: 1em;
+    line-height: 1.6;
+    flex-grow: 1;
+}
+
+/* About page responsive stacking */
+@media screen and (max-width: 992px) {
+    .content-container {
+        flex-direction: column;
+        align-items: center;
+        padding-top: 100px;
+    }
+}
+
+/* About page: center modal and adjust close button */
+body.about-page .wrapper {
+    right: 50%;
+    transform: translate(50%, -50%) scale(0);
+}
+body.about-page .wrapper.active-popup {
+    transform: translate(50%, -50%) scale(1);
+}
+body.about-page .wrapper .icon-close {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Dashboard: base page styles */
+body.dashboard-page {
+    background: #f5f5f5;
+    margin: 0;
+    padding: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Dashboard header */
+.dashboard-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 70px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.dashboard-logo {
+    height: 40px;
+    width: auto;
+}
+.header-right .user-avatar {
+    font-size: 2em;
+    color: #666;
+}
+
+/* Dashboard sidebar and nav */
+.dashboard-sidebar {
+    position: fixed;
+    left: 0;
+    top: 70px;
+    width: 200px;
+    height: calc(100vh - 70px);
+    background: #f8f9fa;
+    border-right: 1px solid #e0e0e0;
+    z-index: 999;
+}
+.sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+.hamburger-menu {
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    color: #333;
+    cursor: pointer;
+}
+.sidebar-nav {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.sidebar-nav li {
+    margin: 0;
+}
+.sidebar-nav a {
+    display: block;
+    padding: 15px 20px;
+    color: #333;
+    text-decoration: none;
+    border-bottom: 1px solid #e0e0e0;
+    transition: background-color 0.3s;
+}
+.sidebar-nav a:hover {
+    background-color: #e9ecef;
+}
+.sidebar-nav a.active {
+    background-color: #dee2e6;
+    font-weight: 600;
+}
+.sidebar-nav .nav-item.hidden {
+    display: none;
+}
+.sidebar-nav .nav-item.hidden.show {
+    display: block;
+}
+
+/* Dashboard main content area */
+.dashboard-main {
+    margin-left: 200px;
+    margin-top: 70px;
+    padding: 30px;
+    min-height: calc(100vh - 70px);
+    background: #fff;
+}
+.dashboard-title {
+    font-size: 2em;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 30px;
+}
+
+/* Schedule table styles */
+.schedule-table-container {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+    margin-bottom: 30px;
+}
+.schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.schedule-table thead {
+    background-color: #f8f9fa;
+}
+.schedule-table th {
+    padding: 15px 20px;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #e0e0e0;
+}
+.schedule-table td {
+    padding: 15px 20px;
+    border-bottom: 1px solid #e0e0e0;
+    color: #555;
+}
+.schedule-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Patient link styles */
+.patient-link {
+    color: #007bff;
+    text-decoration: underline;
+    cursor: pointer;
+}
+.patient-link:hover {
+    color: #0056b3;
+}
+
+/* Pending section toggle */
+.pending-section {
+    margin-top: 20px;
+}
+.pending-toggle {
+    background: none;
+    border: none;
+    font-size: 1.1em;
+    color: #333;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+}
+.pending-toggle:hover {
+    color: #007bff;
+}
+
+/* Calendar layout */
+.calendar-content {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    padding: 30px;
+}
+.calendar-title {
+    font-size: 2em;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 30px;
+    text-align: center;
+}
+.calendar-grid {
+    width: 100%;
+}
+.calendar-header {
+    display: grid;
+    grid-template-columns: 100px repeat(6, 1fr);
+    gap: 1px;
+    background-color: #e0e0e0;
+    border-radius: 8px 8px 0 0;
+    overflow: hidden;
+}
+.time-column {
+    background-color: #f8f9fa;
+    padding: 15px;
+    font-weight: 600;
+    color: #333;
+    text-align: center;
+}
+.day-header {
+    background-color: #f8f9fa;
+    padding: 15px;
+    font-weight: 600;
+    color: #333;
+    text-align: center;
+    border-left: 1px solid #e0e0e0;
+}
+.day-header:first-of-type {
+    background-color: #e9ecef;
+}
+.calendar-body {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e0e0e0;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+}
+
+/* Time slots and day cells */
+.time-slot {
+    display: grid;
+    grid-template-columns: 100px repeat(6, 1fr);
+    gap: 1px;
+    background-color: #e0e0e0;
+    min-height: 60px;
+}
+.time-slot:not(:last-child) {
+    border-bottom: 1px solid #e0e0e0;
+}
+.time-label {
+    background-color: #f8f9fa;
+    padding: 15px;
+    font-weight: 500;
+    color: #555;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.day-cell {
+    background-color: #fff;
+    padding: 10px;
+    border-left: 1px solid #e0e0e0;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 5px;
+}
+.appointment {
+    width: 100%;
+    text-align: left;
+    margin-bottom: 0;
+}
+.patient-appointment {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 4px;
+    background-color: #e3f2fd;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    transition: background-color 0.3s;
+    font-size: 0.9em;
+}
+.patient-appointment:hover {
+    background-color: #bbdefb;
+    color: #0056b3;
+}
+
+/* Patient profile card */
+.patient-profile-content {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    padding: 30px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+.profile-header {
+    margin-bottom: 30px;
+}
+.back-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #333;
+    text-decoration: none;
+    font-size: 1.2em;
+    font-weight: 600;
+    transition: color 0.3s;
+}
+.back-link:hover {
+    color: #007bff;
+}
+.patient-info {
+    text-align: center;
+    margin-bottom: 40px;
+}
+.patient-info h2 {
+    font-size: 2em;
+    color: #333;
+    margin-bottom: 10px;
+}
+.patient-info p {
+    font-size: 1.1em;
+    color: #666;
+    margin: 5px 0;
+}
+.severity-percentage {
+    font-size: 3em;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 20px;
+}
+.severity-description {
+    max-width: 600px;
+    margin: 0 auto;
+    font-size: 1.1em;
+    line-height: 1.6;
+    color: #555;
+}
+.profile-actions {
+    text-align: right;
+    margin-top: 40px;
+}
+.view-report-link {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 10px 20px;
+    border: 2px solid #007bff;
+    border-radius: 6px;
+    transition: all 0.3s;
+}
+.view-report-link:hover {
+    background-color: #007bff;
+    color: white;
+}
+
+/* Severity gauge: container and layout */
+.severity-gauge-container {
+    text-align: center;
+    margin-bottom: 40px;
+    position: relative;
+}
+
+/* Gauge wrapper (semi-circle) */
+.gauge-wrapper {
+    position: relative;
+    width: 300px;
+    height: 150px;
+    margin: 40px auto 30px;
+}
+
+/* Colored arc using conic gradient */
+.gauge-arc {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 150px 150px 0 0;
+    background: conic-gradient(
+        from 180deg, 
+        #7ED321 0% 33.33%,
+        #F5A623 33.33% 66.66%,
+        #D0021B 66.66% 100%
+    );
+}
+
+/* Inner mask to create arc thickness */
+.gauge-mask {
+    position: absolute;
+    top: 25px;
+    left: 25px;
+    width: 250px;
+    height: 125px;
+    background: #fff;
+    border-radius: 125px 125px 0 0;
+}
+
+/* Gauge icons (emojis) */
+.gauge-icon {
+    position: absolute;
+    font-size: 1.8em;
+    z-index: 10;
+}
+.icon-happy {
+    top: 10px;
+    left: 20px;
+}
+.icon-neutral {
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+.icon-sad {
+    top: 10px;
+    right: 20px;
+}
+
+/* Needle and pivot */
+.gauge-needle {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 6px;
+    height: 110px;
+    background: #4A4A4A;
+    transform-origin: bottom center;
+    border-radius: 3px;
+    z-index: 5;
+}
+.gauge-pivot {
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 20px;
+    background: #4A4A4A;
+    border-radius: 50%;
+    z-index: 6;
+}
+
+/* Dashboard responsive: collapse sidebar */
+@media screen and (max-width: 768px) {
+    .dashboard-sidebar {
+        width: 100%;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+    .dashboard-sidebar.open {
+        transform: translateX(0);
+    }
+    .dashboard-main {
+        margin-left: 0;
+    }
+    .dashboard-header {
+        padding: 0 15px;
+    }
+    .dashboard-main {
+        padding: 20px 15px;
+    }
+    .calendar-header,
+    .time-slot {
+        grid-template-columns: 80px repeat(6, 1fr);
+    }
+    .time-column,
+    .time-label {
+        font-size: 0.9em;
+        padding: 10px;
+    }
+    .day-header {
+        font-size: 0.9em;
+        padding: 10px;
+    }
+}
+
+/* Calendar controls */
+.calendar-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+.calendar-title {
+    margin-bottom: 0;
+    text-align: center;
+    flex-grow: 1;
+}
+.calendar-nav-btn {
+    background: none;
+    border: 1px solid #007bff;
+    color: #007bff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.3s;
+}
+.calendar-nav-btn:hover {
+    background: #007bff;
+    color: #fff;
+}
+.patient-appointment .appt-time {
+    display: block;
+    font-weight: 600;
+    font-size: 0.9em;
+    color: #0056b3;
+    margin-top: 2px;
+}

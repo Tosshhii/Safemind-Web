@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeMind - Calendar</title>
+    <link rel="stylesheet" href="stylesheet.css">
+</head>
+
+<body class="dashboard-page">
+    <header class="dashboard-header">
+        <div class="header-left">
+            <img src="images/logo.png" alt="SafeMind Logo" class="dashboard-logo">
+        </div>
+        <div class="header-right">
+            <div class="user-avatar">
+                <ion-icon name="person-circle"></ion-icon>
+            </div>
+        </div>
+    </header>
+
+    <nav class="dashboard-sidebar">
+        <div class="sidebar-header">
+            <button class="hamburger-menu">
+                <ion-icon name="menu"></ion-icon>
+            </button>
+        </div>
+        <ul class="sidebar-nav">
+            <li class="nav-item hidden"><a href="index.html">Home</a></li>
+            <li class="nav-item hidden"><a href="about.html">About Us</a></li>
+            <li><a href="dashboard.html">Dashboard</a></li>
+            <li><a href="calendar.html" class="active">Calendar</a></li>
+        </ul>
+    </nav>
+
+    <main class="dashboard-main">
+        <div class="calendar-content">
+            
+            <div class="calendar-nav">
+                <button id="prev-week" class="calendar-nav-btn">
+                    <ion-icon name="chevron-back"></ion-icon> Previous
+                </button>
+                <h1 id="calendar-title" class="calendar-title"></h1>
+                <button id="next-week" class="calendar-nav-btn">
+                    Next <ion-icon name="chevron-forward"></ion-icon>
+                </button>
+            </div>
+            
+            <div class="calendar-grid">
+                <div id="calendar-header" class="calendar-header">
+                    </div>
+                
+                <div id="calendar-body" class="calendar-body">
+                    </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="script.js" defer></script>
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</body>
+
+</html>

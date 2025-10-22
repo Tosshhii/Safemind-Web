@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeMind - About Us</title>
+    <link rel="stylesheet" href="stylesheet.css">
+</head>
+
+<body class="about-page">
+    <header>
+        <a href="index.html">
+            <img src="images/logo.png" alt="SafeMind Logo" class="logo">
+        </a>
+        <nav class="navigation">
+            <a href="index.html">Home</a>
+            <a href="about.html" class="active-link">About</a>
+            <button class="btnLogin-popup">Login</button>
+        </nav>
+    </header>
+
+    <main class="content-container">
+        <section class="card">
+            <img src="images/logo.png" alt="SafeMind Brain Logo">
+            <h2>Welcome to SafeMind</h2>
+            <p>
+                SafeMind is a supportive and an interactive community. Through our platform, people can come together to share their experiences with stress, anxiety, and depression. We believe that every story matters. Whether you're dealing with mental health challenges or offering words of encouragement, your voice has the power to help someone feel less alone.
+            </p>
+        </section>
+
+        <section class="card">
+            <img src="images/book.png" alt="Person writing in a journal">
+            <h2>Share Your Story</h2>
+            <p>
+                Contributing to the SafeMind community isn't just about helping others, it's also a healing process for you. Reflecting on your journey, seeing your growth, and realizing how your story can guide someone else... that's real strength.
+            </p>
+        </section>
+
+        <section class="card">
+            <img src="images/girltalk.png" alt="Two people having a supportive conversation">
+            <h2>Advice and Support</h2>
+            <p>
+                Through peer-to-peer support, users can connect with others who understand what they're going through. From managing anxiety to overcoming panic attacks, the conversations here are grounded in shared experience and mutual growth.
+            </p>
+        </section>
+    </main>
+    
+    <div class="wrapper">
+        <button class="icon-close" aria-label="Close dialog" type="button">
+            <ion-icon name="close"></ion-icon>
+        </button>
+        <div class="form-box login">
+            <h2>Login</h2>
+            <form action="#" autocomplete="on">
+                <div class="input-box">
+                    <span class="icon">
+                        <ion-icon name="mail"></ion-icon>
+                    </span>
+                    <input type="email" id="login-email" name="email" autocomplete="email" required>
+                    <label for="login-email">Email</label>
+                </div>
+                <div class="input-box">
+                    <span class="icon">
+                        <ion-icon name="lock-closed"></ion-icon>
+                    </span>
+                    <input type="password" id="login-password" name="password" autocomplete="current-password" required>
+                    <label for="login-password">Password</label>
+                </div>
+                <div class="remember-forgot">
+                    <label><input type="checkbox" name="remember">Remember me</label>
+                    <a href="#">Forgot Password?</a>
+                </div>
+                <button type="submit" class="btn">Login</button>
+                <div class="login-register">
+                    <p>Don't have an account?<a href="#" class="register-link">Register</a></p>
+                </div>
+            </form>
+        </div>
+        <div class="form-box register">
+            <h2>Registration</h2>
+            <form action="#" autocomplete="on">
+                <div class="input-box">
+                    <span class="icon">
+                        <ion-icon name="person"></ion-icon>
+                    </span>
+                    <input type="text" id="register-username" name="username" autocomplete="username" required>
+                    <label for="register-username">Username</label>
+                </div>
+                <div class="input-box">
+                    <span class="icon">
+                        <ion-icon name="mail"></ion-icon>
+                    </span>
+                    <input type="email" id="register-email" name="email" autocomplete="email" required>
+                    <label for="register-email">Email</label>
+                </div>
+                <div class="input-box">
+                    <span class="icon">
+                        <ion-icon name="lock-closed"></ion-icon>
+                    </span>
+                    <input type="password" id="register-password" name="password" autocomplete="new-password" required>
+                    <label for="register-password">Password</label>
+                </div>
+                <div class="remember-forgot">
+                    <label><input type="checkbox" name="terms" required>I'm 18+ and agree to the terms</label>
+                </div>
+                <button type="submit" class="btn">Register</button>
+                <div class="login-register">
+                    <p>Already have an account?<a href="#" class="login-link">Login</a></p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js" defer></script>
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</body>
+
+</html>

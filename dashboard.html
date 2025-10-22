@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeMind - Dashboard</title>
+    <link rel="stylesheet" href="stylesheet.css">
+</head>
+
+<body class="dashboard-page">
+    <!-- Header -->
+    <header class="dashboard-header">
+        <div class="header-left">
+            <img src="images/logo.png" alt="SafeMind Logo" class="dashboard-logo">
+        </div>
+        <div class="header-right">
+            <div class="user-avatar">
+                <ion-icon name="person-circle"></ion-icon>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <nav class="dashboard-sidebar">
+        <div class="sidebar-header">
+            <button class="hamburger-menu">
+                <ion-icon name="menu"></ion-icon>
+            </button>
+        </div>
+        <ul class="sidebar-nav">
+            <li class="nav-item hidden"><a href="index.html">Home</a></li>
+            <li class="nav-item hidden"><a href="about.html">About Us</a></li>
+            <li><a href="dashboard.html" class="active">Dashboard</a></li>
+            <li><a href="calendar.html">Calendar</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-content">
+            <h1 class="dashboard-title">Today's Schedule</h1>
+            
+            <!-- Schedule Table -->
+            <div class="schedule-table-container">
+                <table class="schedule-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Patient</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>04/21/25</td>
+                            <td>10:00 AM</td>
+                            <td><a href="patient-profile.html?patient=Nat Jalando-on" class="patient-link">Nat Jalando-on</a></td>
+                        </tr>
+                        <tr>
+                            <td>04/21/25</td>
+                            <td>1:00 PM</td>
+                            <td><a href="patient-profile.html?patient=Kenneth Quiballo" class="patient-link">Kenneth Quiballo</a></td>
+                        </tr>
+                        <tr>
+                            <td>04/21/25</td>
+                            <td>2:30 PM</td>
+                            <td><a href="patient-profile.html?patient=Rye Cois" class="patient-link">Rye Cois</a></td>
+                        </tr>
+                        <tr>
+                            <td>04/21/25</td>
+                            <td>4:00 PM</td>
+                            <td><a href="patient-profile.html?patient=Ezaiah Azir" class="patient-link">Ezaiah Azir</a></td>
+                        </tr>
+                        <tr>
+                            <td>04/21/25</td>
+                            <td>5:30 PM</td>
+                            <td><a href="patient-profile.html?patient=Elijah Reign" class="patient-link">Elijah Reign</a></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pending Section -->
+            <div class="pending-section">
+                <button class="pending-toggle">
+                    <ion-icon name="chevron-down"></ion-icon>
+                    Pending
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script src="script.js" defer></script>
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</body>
+
+</html>
