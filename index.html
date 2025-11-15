@@ -7,17 +7,21 @@
     <meta name="description" content="SafeMind — Providing Hope, Healing, and Strength for a Sound Mind.">
     <meta name="theme-color" content="#0a0f14">
     <title>SafeMind</title>
-    <link rel="stylesheet" href="stylesheet.css">
-</head>
+    <link rel="stylesheet" href="stylesheet.css?v=2.5"> </head>
 
 <body>
     <header>
         <img src="images/logo.png" alt="SafeMind Logo" class="logo">
-        <nav class="navigation" aria-label="Primary">
-        <a href="index.html">Home</a>
-        <a href="about.html">About</a>
-    <button class="btnLogin-popup">Login</button>
-</nav>
+        
+        <button class_regular="hamburger-menu mobile-only" id="mobile-hamburger-main" aria-label="Toggle navigation" aria-expanded="false">
+            <ion-icon name="menu"></ion-icon>
+        </button>
+
+        <nav class="navigation" id="primary-navigation" aria-label="Primary">
+            <a href="index.html" id="nav-home-link">Home</a>
+            <a href="about.html">About</a>
+            <a href="#" class="btnLogin-popup" id="nav-action-link">Login</a>
+        </nav>
     </header>
 
     <div class="left-container">
@@ -28,7 +32,7 @@
             </p>
         </main>
     </div>
-    
+
     <div class="wrapper">
         <span class="icon-close">
             <ion-icon name="close"></ion-icon>
@@ -41,14 +45,14 @@
                     <span class="icon">
                         <ion-icon name="mail"></ion-icon>
                     </span>
-                    <input type="email" id="login-email" name="email" autocomplete="email" required>
+                    <input type="email" id="login-email" name="email" autocomplete="email" required placeholder=" ">
                     <label for="login-email">Email</label>
                 </div>
                 <div class="input-box">
                     <span class="icon">
                         <ion-icon name="lock-closed"></ion-icon>
                     </span>
-                    <input type="password" id="login-password" name="password" autocomplete="current-password" required>
+                    <input type="password" id="login-password" name="password" autocomplete="current-password" required placeholder=" ">
                     <label for="login-password">Password</label>
                 </div>
                 <div class="remember-forgot">
@@ -69,35 +73,35 @@
                     <span class="icon">
                         <ion-icon name="person"></ion-icon>
                     </span>
-                    <input type="text" id="register-username" name="username" autocomplete="username" required>
+                    <input type="text" id="register-username" name="username" autocomplete="username" required placeholder=" ">
                     <label for="register-username">Username</label>
                 </div>
                 <div class="input-box">
                     <span class="icon">
                         <ion-icon name="mail"></ion-icon>
                     </span>
-                    <input type="email" id="register-email" name="email" autocomplete="email" required>
+                    <input type="email" id="register-email" name="email" autocomplete="email" required placeholder=" ">
                     <label for="register-email">Email</label>
                 </div>
                 <div class="input-box">
                     <span class="icon">
                         <ion-icon name="lock-closed"></ion-icon>
                     </span>
-                    <input type="password" id="register-password" name="password" autocomplete="new-password" required>
+                    <input type="password" id="register-password" name="password" autocomplete="new-password" required placeholder=" ">
                     <label for="register-password">Password</label>
                 </div>
                 <div class="remember-forgot">
                     <label><input type="checkbox" name="terms" required>I'm 18+ and agree to the terms</label>
                 </div>
                 <button type="submit" class="btn">Register</button>
-                <div class="login-register">
+                 <div class="login-register">
                     <p>Already have an account?<a href="#" class="login-link">Login</a></p>
                 </div>
             </form>
         </div>
     </div>
 
-    <script src="script.js" defer></script>
+    <script type="module" src="script.js" defer></script>
     <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
 </body>

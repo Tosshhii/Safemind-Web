@@ -5,11 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SafeMind - Patient Profile</title>
-    <link rel="stylesheet" href="stylesheet.css">
+    <link rel="stylesheet" href="stylesheet.css?v=2.5">
 </head>
 
 <body class="dashboard-page">
     <header class="dashboard-header">
+        <button class="hamburger-menu mobile-only" id="mobile-hamburger">
+            <ion-icon name="menu"></ion-icon>
+        </button>
         <div class="header-left">
             <img src="images/logo.png" alt="SafeMind Logo" class="dashboard-logo">
         </div>
@@ -17,8 +20,21 @@
             <div class="user-avatar">
                 <ion-icon name="person-circle"></ion-icon>
             </div>
-        </div>
-    </header>
+            
+            <div class="profile-dropdown">
+                <div class="profile-info">
+                    <ion-icon name="person-circle-outline"></ion-icon>
+                    <span id="user-email-display">loading...</span>
+                </div>
+                <ul class="profile-menu">
+                    <li><a href="#" id="logout-button">
+                        <ion-icon name="log-out-outline"></ion-icon>
+                        Logout
+                    </a></li>
+                </ul>
+            </div>
+            </div>
+        </header>
 
     <nav class="dashboard-sidebar">
         <div class="sidebar-header">
@@ -78,7 +94,7 @@
         </div>
     </main>
 
-    <script src="script.js" defer></script>
+    <script type="module" src="script.js" defer></script>
     <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
 </body>
