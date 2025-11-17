@@ -20,7 +20,7 @@ import {
     sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 
-// --- ADDED: FIRESTORE IMPORTS ---
+// --- (UPDATED) FIRESTORE IMPORTS ---
 import { 
     getFirestore, 
     collection, 
@@ -28,8 +28,11 @@ import {
     getDocs,
     query,
     orderBy,
-    where // Added for dashboard query
-} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+    where, // Added for dashboard query
+    doc,     
+    getDoc,  
+    limit  
+} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js"; // <-- THIS WAS THE BROKEN LINE
 // --- END FIRESTORE IMPORTS ---
 
 
@@ -53,6 +56,37 @@ const auth = getAuth(app);
 const analytics = getAnalytics(app);
 const db = getFirestore(app); // Initialize Firestore
 // --- END: Firebase Initialization ---
+
+
+// --- **** NEW QUESTION MAP (FROM YOUR LIST) **** ---
+const QUESTION_MAP = {
+    // Section 1
+    "rating_1": "I easily get irritated or frustrated with others.",
+    "rating_2": "I have little interest or pleasure in doing things I used to enjoy.",
+    "text_1": "How would you describe your emotional state during the past two weeks?",
+    "text_2": "What situations or experiences make you feel most hopeless or disinterested?",
+    // Section 2
+    "rating_3": "I avoid situations that make me feel anxious.",
+    "rating_4": "I frequently feel nervous, anxious, or on edge.",
+    "text_3": "What kinds of things make you feel anxious or worried, and how do you handle them?",
+    "text_4": "How has the anxiety affected your daily activities or interactions with others?",
+    // Section 3
+    "rating_5": "I start more projects or take more risks than usual.",
+    "rating_6": "I sleep less but still have a lot of energy.",
+    "text_5": "Can you describe times when you felt unusually energetic or driven to take on new activities?",
+    "text_6": "How do these changes in energy or activity level affect your relationships or responsibilities?",
+    // Section 4
+    "rating_7": "I experience unexplained aches or pains such as headaches, back pain, or stomach pain.",
+    "rating_8": "I feel my medical problems or symptoms are not taken seriously enough by others.",
+    "text_7": "Have you noticed any recurring physical discomfort (such as headaches or body pain)? What do you think causes them?",
+    "text_8": "How do your physical sensations or health concerns influence your emotions or thoughts?",
+    // Section 5
+    "rating_9": "I have trouble sleeping, or my sleep does not feel restful.",
+    "rating_10": "I often feel too tired to complete my usual tasks.",
+    "text_9": "How has your sleep pattern changed recently, and what do you think is affecting it?",
+    "text_10": "What do you notice about your energy or motivation during the day?"
+};
+// --- **** END OF NEW MAP **** ---
 
 
 // --- (UPDATED) Auth State Listener ---
@@ -126,15 +160,13 @@ onAuthStateChanged(auth, (user) => {
 // --- END: Auth State Listener ---
 
 
-// --- UPDATED FUNCTION: Load appointments for Dashboard ---
+// --- (UPDATED) Load appointments for Dashboard ---
 async function loadAppointments() {
     const tableBody = document.getElementById('schedule-table-body');
     if (!tableBody) return; // Stop if we're not on the dashboard page
 
     tableBody.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
-    let html = '';
-    let appointmentsFound = false; // Flag to check if we find any appointments
-
+    
     // --- FIX: Get today's date in "DD/MM/YYYY" format ---
     const today = new Date();
     const d = String(today.getDate()).padStart(2, '0');
@@ -157,16 +189,37 @@ async function loadAppointments() {
         // 2. Fetch the documents
         const querySnapshot = await getDocs(q);
 
-        // 3. Loop through each document and build an HTML row
-        querySnapshot.forEach((doc) => {
-            appointmentsFound = true; // Set flag to true
-            const appt = doc.data(); 
-            
-            // Use .userId (lowercase 'd')
-            const patientName = appt.patient || appt.bookedBy || appt.userId || "Unknown Patient";
-            const patientURL = `patient-profile.html?patient=${encodeURIComponent(patientName)}`;
+        if (querySnapshot.empty) {
+            tableBody.innerHTML = `<tr><td colspan="3">No appointments found for today (${todaysDateString}).</td></tr>`;
+            return;
+        }
 
-            html += `
+        // 3. Create promises for each appointment to fetch user data
+        const appointmentPromises = querySnapshot.docs.map(async (apptDoc) => {
+            const appt = apptDoc.data();
+            const patientId = appt.userId;
+            let patientName = "Unknown Patient";
+            let patientURL = '#';
+
+            if (patientId) {
+                // --- THIS IS THE NEW PART ---
+                // For each appointment, fetch the patient's name from the 'users' collection
+                try {
+                    const userDocRef = doc(db, 'users', patientId); // 'doc' is imported
+                    const userDocSnap = await getDoc(userDocRef);
+
+                    if (userDocSnap.exists()) {
+                        patientName = userDocSnap.data().name || "Unknown Patient";
+                    }
+                } catch (userError) {
+                    console.error("Error fetching patient name for", patientId, userError);
+                }
+                patientURL = `patient-profile.html?id=${encodeURIComponent(patientId)}`;
+                // --- END NEW PART ---
+            }
+
+            // Return the HTML row for this appointment
+            return `
                 <tr>
                     <td data-label="Date">${appt.date}</td>
                     <td data-label="Time">${appt.time}</td>
@@ -177,12 +230,11 @@ async function loadAppointments() {
             `;
         });
 
-        // 4. Check if we found anything
-        if (!appointmentsFound) {
-            tableBody.innerHTML = `<tr><td colspan="3">No appointments found for today (${todaysDateString}).</td></tr>`;
-        } else {
-            tableBody.innerHTML = html;
-        }
+        // 4. Wait for all the user fetches and HTML creation to complete
+        const htmlRows = await Promise.all(appointmentPromises);
+
+        // 5. Join all the HTML rows and set the table body
+        tableBody.innerHTML = htmlRows.join('');
 
     } catch (error) {
         console.error("Error loading appointments: ", error);
@@ -196,17 +248,19 @@ async function loadAppointments() {
         }
     }
 }
-// --- END NEW FUNCTION ---
+// --- END UPDATED FUNCTION ---
 
 
 // --- (LATEST) Calendar state & functions ---
 let currentViewDate = new Date();
-// This maps our database time (07:00) to a grid row number (1)
+// --- **** TIME CHANGE #1: New 8am-6pm map **** ---
+// This maps our database time (08:00) to a grid row number (1)
 const timeToRow = {
-    '07:00': 1, '08:00': 2, '09:00': 3, '10:00': 4, '11:00': 5, '12:00': 6,
-    '13:00': 7, '14:00': 8, '15:00': 9, '16:00': 10, '17:00': 11
+    '08:00': 1, '09:00': 2, '10:00': 3, '11:00': 4, '12:00': 5,
+    '13:00': 6, '14:00': 7, '15:00': 8, '16:00': 9, '17:00': 10
 };
-const timeSlots = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+// --- **** TIME CHANGE #2: New 8am-5pm labels (for 10 slots) **** ---
+const timeSlots = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 
 // This function now *only* draws the background grid and labels
 function renderWeeklyCalendar(date) {
@@ -218,17 +272,17 @@ function renderWeeklyCalendar(date) {
     calendarHeader.innerHTML = ''; // Clear header
     calendarBody.innerHTML = '';   // Clear body
 
-    const monday = getMonday(date);
+    const sunday = getSunday(date);
     const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long' });
     const dayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
 
-    calendarTitle.textContent = `${monthFormatter.format(monday).toUpperCase()} ${monday.getFullYear()}`;
+    calendarTitle.textContent = `${monthFormatter.format(sunday).toUpperCase()} ${sunday.getFullYear()}`;
 
     // 1. Build Header
     calendarHeader.innerHTML = '<div class="time-column">Time</div>';
-    for (let i = 0; i < 6; i++) { // MON - SAT
-        const currentDay = new Date(monday);
-        currentDay.setDate(monday.getDate() + i);
+    for (let i = 0; i < 7; i++) { // SUN - SAT
+        const currentDay = new Date(sunday);
+        currentDay.setDate(sunday.getDate() + i);
         const dayName = dayFormatter.format(currentDay).toUpperCase();
         const dayNum = currentDay.getDate();
         calendarHeader.innerHTML += `<div class="day-header">${dayName} ${dayNum}</div>`;
@@ -242,11 +296,12 @@ function renderWeeklyCalendar(date) {
         label.className = 'time-label';
         label.textContent = formatTimeLabel(time);
         label.style.gridRow = i + 1; // Place it in the correct row
+        label.style.gridColumn = 1;  
         calendarBody.appendChild(label);
     }
     
-    // Add day background columns
-    for (let i = 0; i < 6; i++) { // 6 day columns
+    // Add 7 day columns
+    for (let i = 0; i < 7; i++) { // 7 day columns
         const dayCol = document.createElement('div');
         dayCol.className = 'day-bg-col';
         dayCol.style.gridColumn = i + 2; // Start from 2nd grid column
@@ -254,8 +309,7 @@ function renderWeeklyCalendar(date) {
     }
 }
 
-// --- LATEST CALENDAR FUNCTION ---
-// This function now fetches AND places the appointments
+// --- **** LATEST CALENDAR FUNCTION (WITH NAME FETCHING) **** ---
 async function initializeCalendar() {
     const calendarBody = document.getElementById('calendar-body');
     if (!calendarBody) return;
@@ -263,14 +317,12 @@ async function initializeCalendar() {
     // 1. Render the background grid first
     renderWeeklyCalendar(currentViewDate);
 
-    // --- Define the date range for the current view ---
-    const weekStart = getMonday(currentViewDate);
-    weekStart.setHours(0, 0, 0, 0); // Normalize to start of Monday
+    const weekStart = getSunday(currentViewDate);
+    weekStart.setHours(0, 0, 0, 0); // Normalize to start of Sunday
 
     const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 5); // Go to Saturday
+    weekEnd.setDate(weekStart.getDate() + 6); 
     weekEnd.setHours(23, 59, 59, 999); // Normalize to end of Saturday
-    // --- END ---
 
     try {
         // 2. Fetch all appointments
@@ -282,11 +334,10 @@ async function initializeCalendar() {
         }
 
         // 3. Loop through docs and place them on the grid
-        querySnapshot.forEach((doc) => {
-            const appt = doc.data();
-            
-            // --- FIX 1: Changed .userID to .userId (lowercase 'd') ---
-            const patientName = appt.patient || appt.bookedBy || appt.userId || "Unknown";
+        //    (Using async forEach to fetch names)
+        querySnapshot.forEach(async (apptDoc) => {
+            const appt = apptDoc.data();
+            const patientId = appt.userId; // Get the ID
 
             // A. Format Date (DD/MM/YYYY -> Date object)
             const dateParts = appt.date.split('/'); 
@@ -294,17 +345,12 @@ async function initializeCalendar() {
                 console.warn("Skipping appointment with malformed date:", appt.date);
                 return;
             }
-
-            // Trim whitespace from date parts
             const day = dateParts[0].trim();
             const month = dateParts[1].trim();
             const year = dateParts[2].trim();
-            
-            // Create date string in YYYY-MM-DD format
             const isoDateStr = `${year}-${month}-${day}T00:00:00`;
             const apptDate = new Date(isoDateStr);
 
-            // Check for Invalid Date
             if (isNaN(apptDate.getTime())) {
                 console.warn("Skipping appointment with invalid date:", appt.date, "Parsed as:", isoDateStr);
                 return;
@@ -315,33 +361,42 @@ async function initializeCalendar() {
                 return; // Skip this appointment, it's not for this week
             }
             
-            // C. Get Day of Week (0=Sun, 1=Mon...). We ignore Sunday (0).
+            // C. Get Day of Week (0=Sun, 1=Mon...).
             const apptDay = apptDate.getDay();
-            if (apptDay === 0) return; // Skip Sundays
-            const colStart = apptDay + 1; // Mon=2, Tue=3...
+            const colStart = apptDay + 2; // Sun=2, Mon=3...
 
             // D. Get Time Info
             const timeParts = appt.time.split('-');
             if (timeParts.length !== 2) return;
             
-            // Trim whitespace from time parts
             const rawStartTime = timeParts[0].trim(); 
             const endTimePart = timeParts[1].trim(); 
             
-            // --- FIX 2: Use the new helper function to normalize time ---
-            const startTime = normalizeStartTime(rawStartTime); // "8:00" -> "08:00", "2:00" -> "14:00"
+            const startTime = normalizeStartTime(rawStartTime);
             const endTime = normalizeStartTime(endTimePart.split(':')[0] + ':00');
 
             const rowStart = timeToRow[startTime];
-            
-            // rowEnd should be the row *after* the appointment ends
             const rowEnd = timeToRow[endTime] ? timeToRow[endTime] : (timeToRow[startTime] + 1); 
             
-            // Skip if time is not in our grid
             if (!rowStart) {
                 console.warn("Skipping appointment. Could not find row for start time:", startTime, "(Original:", rawStartTime, ")");
                 return;
             }
+
+            // --- **** NEW: Fetch Patient Name **** ---
+            let patientName = "Unknown Patient";
+            if (patientId) {
+                try {
+                    const userDocRef = doc(db, 'users', patientId);
+                    const userDocSnap = await getDoc(userDocRef);
+                    if (userDocSnap.exists()) {
+                        patientName = userDocSnap.data().name || "Unknown Patient";
+                    }
+                } catch (e) {
+                    console.error("Error fetching name for calendar", e);
+                }
+            }
+            // --- **** END: Fetch Patient Name **** ---
 
             // E. Create the appointment element
             const apptElement = document.createElement('div');
@@ -350,11 +405,11 @@ async function initializeCalendar() {
             // Set grid position via CSS variables
             apptElement.style.setProperty('--col-start', colStart);
             apptElement.style.setProperty('--row-start', rowStart);
-            apptElement.style.setProperty('--row-end', rowEnd); // Spans *until* this row
+            apptElement.style.setProperty('--row-end', rowEnd);
             
-            // Create the inner link
+            // Create the inner link (use the new patientName)
             apptElement.innerHTML = `
-                <a href="patient-profile.html?patient=${encodeURIComponent(patientName)}" class="patient-appointment">
+                <a href="patient-profile.html?id=${encodeURIComponent(patientId)}" class="patient-appointment">
                     ${patientName}
                     <span class="appt-time">${appt.time}</span>
                 </a>
@@ -378,10 +433,11 @@ function formatTimeLabel(time) {
     return `${displayHour} ${ampm}`;
 }
 
-function getMonday(date) {
+// --- CHANGE #8: This function now gets SUNDAY ---
+function getSunday(date) {
     const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const day = d.getDay(); // 0 for Sunday, 1 for Monday, etc.
+    const diff = d.getDate() - day; // Subtract the day number to get to Sunday
     return new Date(d.setDate(diff));
 }
 
@@ -396,7 +452,6 @@ function normalizeStartTime(timeStr) {
     if (isNaN(hour)) return null;
 
     // Convert 12-hour PM times (1-5) to 24-hour
-    // This assumes 1:00-5:00 are PM. If you have AM times like 1AM, this logic needs to be smarter.
     if (hour >= 1 && hour <= 5) {
         hour += 12; // "2:00" becomes 14
     }
@@ -418,7 +473,6 @@ let allAppointments = [];
 const wrapper = document.querySelector('.wrapper');
 const loginlink = document.querySelector('.login-link');
 const regsiterlink = document.querySelector('.register-link');
-// btnPopup is effectively replaced by navActionLink logic
 const iconClose = document.querySelector('.icon-close');
 const body = document.querySelector('body');
 const nav = document.getElementById('primary-navigation'); // Might be null
@@ -559,46 +613,169 @@ if (sidebarHamburger && hiddenNavItems.length > 0) {
     });
 }
 
-// --- Load patient profile and update gauge ---
-function loadPatientProfile() {
+// --- **** (THIS IS THE UPDATED FUNCTION) **** ---
+async function loadPatientProfile() {
     const urlParams = new URLSearchParams(window.location.search);
-    const patientName = urlParams.get('patient');
+    const patientId = urlParams.get('id');
 
-    if (patientName) {
-        const nameElement = document.getElementById('patient-name');
-        
-        // Use .userId (lowercase 'd')
-        if (nameElement) nameElement.textContent = patientName + ' /M';
+    // --- Get all page elements ---
+    const nameElement = document.getElementById('patient-name');
+    const ageElement = document.getElementById('patient-age');
+    const locationElement = document.getElementById('patient-location');
+    const severityElement = document.getElementById('severity-value');
+    const severityTextElement = document.getElementById('severity-text');
+    const descriptionElement = document.querySelector('.severity-description p');
+    const needle = document.getElementById('gauge-needle');
 
-        let severity = 92; // Default or fetch actual data
-        if (patientName.includes('Kenneth')) severity = 45;
-        else if (patientName.includes('Rye')) severity = 25;
-        else if (patientName.includes('Ezaiah')) severity = 78;
-        else if (patientName.includes('Elijah')) severity = 35;
-        else if (patientName.includes('guest')) severity = 68; // Added 'guest'
+    // --- Get all NEW modal elements ---
+    const modalPatientName = document.getElementById('modal-patient-name');
+    const modalPatientAge = document.getElementById('modal-patient-age');
+    const modalPatientLocation = document.getElementById('modal-patient-location');
+    const modalPatientEmail = document.getElementById('modal-patient-email');
+    const modalSeverityText = document.getElementById('modal-severity-text');
+    const modalSeverityPercent = document.getElementById('modal-severity-percent');
+    const modalRecommendation = document.getElementById('modal-recommendation');
+    const qaContainer = document.getElementById('modal-qa-container');
+    // --- End modal elements ---
 
-        let severityText;
-        if (severity <= 33.33) severityText = 'mild';
-        else if (severity <= 66.66) severityText = 'moderate';
-        else severityText = 'severe';
+    if (!patientId) {
+        if (nameElement) nameElement.textContent = "No Patient ID Provided";
+        return;
+    }
 
-        const severityElement = document.getElementById('severity-value');
-        const severityTextElement = document.getElementById('severity-text');
-        const descriptionElement = document.querySelector('.severity-description p');
+    try {
+        // --- FETCH 1: Get User Info from 'users' collection ---
+        const userDocRef = doc(db, "users", patientId);
+        const userDocSnap = await getDoc(userDocRef);
 
-        if (severityElement) severityElement.textContent = severity + '%';
-        if (severityTextElement) severityTextElement.textContent = severity + '%';
-        if (descriptionElement) {
-            descriptionElement.innerHTML = `Based on SafeMind's analysis, the level of severity of the patient's depression is <strong>${severity}%</strong>, which indicates a <strong>${severityText}</strong> level of depression.`;
+        if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            
+            // Populate main page
+            if (nameElement) nameElement.textContent = userData.name || "Unknown Patient";
+            if (ageElement) ageElement.textContent = userData.age ? `${userData.age} yrs Old` : '-- yrs Old';
+            if (locationElement) locationElement.textContent = userData.city || "Unknown Location";
+
+            // --- Populate modal with user data ---
+            if (modalPatientName) modalPatientName.textContent = userData.name || "Unknown Patient";
+            if (modalPatientAge) modalPatientAge.textContent = userData.age || "--";
+            if (modalPatientLocation) modalPatientLocation.textContent = userData.city || "Unknown Location";
+            if (modalPatientEmail) modalPatientEmail.textContent = userData.email || "No email provided";
+            
+        } else {
+            console.log("Patient document not found in 'users' collection");
+            if (nameElement) nameElement.textContent = "Patient Not Found";
         }
 
-        const needle = document.getElementById('gauge-needle');
-        if (needle) {
-            let angle = ((severity / 100) * 180) - 90;
-            needle.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+        // --- FETCH 2: Get Latest Prediction from 'api_predictions' ---
+        const predictionsRef = collection(db, "api_predictions");
+        const q = query(
+            predictionsRef,
+            where("userId", "==", patientId),    // Find reports for this user
+            orderBy("timestamp", "desc"), // Get the most recent one
+            limit(1)                      // Only get one
+        );
+
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            const predictionData = querySnapshot.docs[0].data();
+            
+            // --- Logic for severity and gauge ---
+            const severityCategory = parseFloat(predictionData.severity_numeric) || 0;
+            const severityText = predictionData.severity || 'unknown';
+            const categoryMap = {
+                "0.0": 15, "1.0": 35, "2.0": 65, "3.0": 85
+            };
+            const categoryString = severityCategory.toFixed(1);
+            const displayPercent = categoryMap[categoryString] || 10; 
+            
+            // --- Populate main page ---
+            if (severityElement) severityElement.textContent = displayPercent + '%';
+            if (severityTextElement) severityTextElement.textContent = severityText;
+            if (descriptionElement) {
+                descriptionElement.innerHTML = `Based on SafeMind's analysis, the level of severity of the patient's depression is <strong>${severityText}</strong>, which indicates a <strong>${severityText}</strong> level of depression.`;
+            }
+            if (needle) {
+                let angle = ((displayPercent / 100) * 180) - 90;
+                needle.style.transform = `rotate(${angle}deg)`;
+            }
+
+            // --- Populate modal with analysis data ---
+            if (modalSeverityText) modalSeverityText.textContent = severityText;
+            if (modalSeverityPercent) modalSeverityPercent.textContent = displayPercent + '%';
+            if (modalRecommendation) modalRecommendation.textContent = predictionData.recommendation || "No recommendation provided.";
+
+            // --- **** UPDATED Q&A LOGIC **** ---
+            if (qaContainer) {
+                qaContainer.innerHTML = ''; // Clear any old data
+                
+                // Get the input_data map, or use the root document as a fallback
+                const answersData = predictionData.input_data || predictionData;
+
+                // Loop through all keys in the answers data
+                Object.keys(answersData)
+                    .filter(key => key.startsWith('text_') || key.startsWith('rating_')) // Get all 'text_' and 'rating_' keys
+                    .sort((a, b) => {
+                        // Sort keys numerically (e.g., rating_1, text_1, rating_2, text_2)
+                        const numA = parseInt(a.split('_')[1], 10);
+                        const numB = parseInt(b.split('_')[1], 10);
+                        if (numA !== numB) {
+                            return numA - numB;
+                        }
+                        // If number is same, put 'rating_' before 'text_'
+                        return a.localeCompare(b);
+                    })
+                    .forEach(key => {
+                        // Use the key (e.g., 'text_1') to get the question from our map
+                        const questionText = QUESTION_MAP[key] || key; // Use key as fallback
+                        const answer = answersData[key];
+                        
+                        // Create and append the HTML for this Q&A
+                        const item = document.createElement('li');
+                        item.className = 'qa-item';
+                        
+                        // --- NEW LOGIC: Check if it's a rating or text ---
+                        if (key.startsWith('rating_')) {
+                            item.innerHTML = `
+                                <strong>${questionText}</strong>
+                                <p class="rating-answer">Rating: <strong>${answer}</strong> / 5</p>
+                            `;
+                        } else {
+                            item.innerHTML = `
+                                <strong>${questionText}</strong>
+                                <p>${answer}</p>
+                            `;
+                        }
+                        qaContainer.appendChild(item);
+                    });
+                
+                if (qaContainer.children.length === 0) {
+                    qaContainer.innerHTML = '<li>No Q&A data found for this report.</li>';
+                }
+            }
+            // --- **** END OF UPDATED Q&A LOGIC **** ---
+
+        } else {
+            // This runs if the user exists but has no analysis reports
+            console.log("No prediction found for this user.");
+            if (severityElement) severityElement.textContent = '--%';
+            if (severityTextElement) severityTextElement.textContent = 'No analysis';
+        }
+
+    } catch (error) {
+        console.error("Error fetching patient data: ", error);
+        if (error.code === 'failed-precondition') {
+            console.warn("QUERY FAILED: This query requires a composite index. Check the console for a link to create it.");
+            if (nameElement) nameElement.textContent = "Database Index Error";
+            if (descriptionElement) descriptionElement.innerHTML = "This page failed to load due to a database configuration error. <strong>Check the F12 console for a link to create the required index.</strong>";
+        } else {
+            if (nameElement) nameElement.textContent = "Error loading profile.";
         }
     }
 }
+// --- END UPDATED FUNCTION ---
+
 
 // --- Respect reduced motion ---
 const mediaReduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -710,5 +887,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
         });
     }
+
+    // --- **** NEW MODAL CLICK HANDLERS **** ---
+    const reportButton = document.querySelector('.view-report-link');
+    const modalWrapper = document.querySelector('.report-modal-wrapper');
+    const modalScrim = document.querySelector('.report-scrim');
+    const modalClose = document.querySelector('.report-modal-close');
+
+    if (reportButton && modalWrapper && modalScrim && modalClose) {
+        // Function to open the modal
+        const openModal = () => {
+            modalWrapper.classList.add('show');
+            modalScrim.classList.add('show');
+            document.body.style.overflow = 'hidden'; // Prevent background scroll
+        };
+
+        // Function to close the modal
+        const closeModal = () => {
+            modalWrapper.classList.remove('show');
+            modalScrim.classList.remove('show');
+            document.body.style.overflow = ''; // Allow background scroll
+        };
+
+        // Add click events
+        reportButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            openModal();
+        });
+        
+        modalClose.addEventListener('click', closeModal);
+        modalScrim.addEventListener('click', closeModal);
+    }
+    // --- **** END OF NEW MODAL HANDLERS **** ---
 
 }); // End of DOMContentLoaded

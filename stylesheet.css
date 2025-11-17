@@ -1423,7 +1423,7 @@ img {
 
 /* ---
 ---
---- NEW CALENDAR STYLES ---
+--- NEW CALENDAR STYLLES ---
 --- (Replaces all old calendar styles) ---
 ---
 --- */
@@ -1443,8 +1443,8 @@ img {
 /* Calendar Header (MON 17, TUE 18...) */
 .calendar-header {
     display: grid;
-    /* 100px for time column, 6 days */
-    grid-template-columns: 100px repeat(6, 1fr); 
+    /* 100px for time column, 7 days */
+    grid-template-columns: 100px repeat(7, 1fr); 
     border: 1px solid #e0e0e0;
     border-radius: 8px 8px 0 0;
     overflow: hidden;
@@ -1463,10 +1463,10 @@ img {
 /* Calendar Body (The grid) */
 .calendar-body {
     display: grid;
-    /* 100px for time column, 6 days */
-    grid-template-columns: 100px repeat(6, 1fr);
-    /* 11 rows for 7am-5pm (7-8, 8-9... 4-5) */
-    grid-template-rows: repeat(11, 60px); 
+    /* 100px for time column, 7 days */
+    grid-template-columns: 100px repeat(7, 1fr); 
+    /* **** THIS IS THE CHANGED LINE (10 rows) **** */
+    grid-template-rows: repeat(10, 60px); 
     border: 1px solid #e0e0e0;
     border-top: none;
     border-radius: 0 0 8px 8px;
@@ -1517,13 +1517,18 @@ img {
     background-color: #e3f2fd;
     border: 1px solid #bbdefb;
     border-radius: 4px;
-    padding: 8px 12px;
+    padding: 4px 8px; /* <-- CHANGED */
     box-sizing: border-box;
     
     color: #01579b;
     text-decoration: none;
     font-weight: 500;
-    font-size: 0.9em;
+    font-size: 0.85em; /* <-- CHANGED */
+
+    /* --- **** NEW TEXT OVERFLOW RULES **** --- */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .patient-appointment:hover {
     background-color: #bbdefb;
@@ -1532,6 +1537,7 @@ img {
     display: block;
     font-weight: 600;
     margin-top: 2px;
+    font-size: 0.9em; /* <-- CHANGED */
 }
 
 /* Multi-color hues */
@@ -1593,7 +1599,7 @@ img {
     
     /* Responsive grid */
     .calendar-header, .calendar-body {
-        grid-template-columns: 80px repeat(6, 1fr);
+        grid-template-columns: 80px repeat(7, 1fr); 
     }
     .time-column, .time-label {
         font-size: 0.9em;
@@ -1632,7 +1638,7 @@ img {
     
     /* Smaller grid for small phones */
     .calendar-header, .calendar-body {
-        grid-template-columns: 60px repeat(6, 1fr);
+        grid-template-columns: 60px repeat(7, 1fr); 
     }
     .time-column, .time-label, .day-header {
         font-size: 0.8em;
@@ -1643,3 +1649,172 @@ img {
         padding: 6px 10px;
     }
 }
+
+/* --- **** NEW MODAL STYLES **** --- */
+/* The dark background overlay */
+.report-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1001;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s;
+}
+.report-scrim.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* The modal container */
+.report-modal-wrapper {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    z-index: 1002;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+    width: 90%;
+    max-width: 650px;
+    
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+.report-modal-wrapper.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+/* The modal's scrollable content */
+.report-modal-content {
+    padding: 30px;
+    max-height: 85vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+/* Modal close button */
+.report-modal-close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: #f0f0f0;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2em;
+    color: #555;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+.report-modal-close:hover {
+    background: #e0e0e0;
+}
+
+/* Modal sections */
+.report-modal-title {
+    font-size: 1.8em;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 25px;
+    padding-right: 30px; /* Space for close button */
+}
+
+.report-section {
+    margin-bottom: 25px;
+    padding-bottom: 25px;
+    border-bottom: 1px solid #e0e0e0;
+}
+.report-section:last-of-type {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.report-section h3 {
+    font-size: 1.3em;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 15px;
+}
+
+/* Patient info section */
+.report-patient-info h3 {
+    font-size: 1.5em; /* Make name bigger */
+    margin-bottom: 5px;
+}
+.report-patient-info p {
+    font-size: 1em;
+    color: #555;
+    line-height: 1.5;
+}
+
+/* Severity section */
+.report-severity-info p {
+    font-size: 1.1em;
+    color: #333;
+}
+.report-recommendation {
+    margin-top: 15px;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+}
+.report-recommendation strong {
+    font-weight: 600;
+    color: #333;
+}
+.report-recommendation p {
+    font-size: 1em;
+    color: #555;
+    line-height: 1.6;
+    margin-top: 5px;
+}
+
+/* Q&A list */
+.report-qa-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.qa-item {
+    margin-bottom: 20px;
+}
+.qa-item strong {
+    display: block;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 5px;
+}
+.qa-item p {
+    font-size: 1em;
+    color: #555;
+    line-height: 1.6;
+    background: #fdfdfd;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #eee;
+}
+
+/* --- **** ADD THIS NEW STYLE **** --- */
+.qa-item p.rating-answer {
+    font-size: 1.1em;
+    color: #007bff; /* Blue to stand out */
+    background: #f8f9fa;
+    border: none;
+    padding: 10px 0;
+}
+.qa-item p.rating-answer strong {
+    font-size: 1.2em;
+    color: #0056b3;
+}
+/* --- **** END OF NEW STYLE **** --- */

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SafeMind - Patient Profile</title>
-    <link rel="stylesheet" href="stylesheet.css?v=2.5">
+    <link rel="stylesheet" href="stylesheet.css?v=2.7">
 </head>
 
 <body class="dashboard-page">
@@ -60,9 +60,9 @@
             </div>
             
             <div class="patient-info">
-                <h2 id="patient-name">Nat Jalando-on /M</h2>
-                <p id="patient-age">18 yrs Old</p>
-                <p id="patient-location">Tarlac City</p>
+                <h2 id="patient-name">Loading...</h2>
+                <p id="patient-age">-- yrs Old</p>
+                <p id="patient-location">Loading location...</p>
             </div>
             
             <div class="severity-gauge-container">
@@ -80,11 +80,10 @@
                 </div>
                 
                 <div class="severity-percentage">
-                    <span id="severity-value">92%</span>
+                    <span id="severity-value">--%</span>
                 </div>
-                
                 <div class="severity-description">
-                    <p>Based on SafeMind's analysis, the level of severity of the patient's depression is <strong id="severity-text">92%</strong>, which indicates a <strong>severe</strong> level of depression.</p>
+                    <p>Based on SafeMind's analysis, the level of severity of the patient's depression is <strong id="severity-text">--%</strong>, which indicates a <strong>...</strong> level of depression.</p>
                 </div>
             </div>
             
@@ -92,7 +91,45 @@
                 <a href="#" class="view-report-link">View Full Report</a>
             </div>
         </div>
-    </main>
+
+        <div class="report-scrim"></div>
+        <div class="report-modal-wrapper">
+            <div class="report-modal-content">
+                <button class="report-modal-close">
+                    <ion-icon name="close"></ion-icon>
+                </button>
+                
+                <h2 class="report-modal-title">Full Patient Report</h2>
+                
+                <div class="report-section report-patient-info">
+                    <h3 id="modal-patient-name">Loading...</h3>
+                    <p>
+                        <span id="modal-patient-age">--</span> yrs old from 
+                        <span id="modal-patient-location">...</span>
+                    </p>
+                    <p id="modal-patient-email">...</p>
+                </div>
+                
+                <div class="report-section report-severity-info">
+                    <h3>Analysis Result</h3>
+                    <p>
+                        Severity: <strong id="modal-severity-text">...</strong> 
+                        (<span id="modal-severity-percent">--%</span>)
+                    </p>
+                    <div class="report-recommendation">
+                        <strong>Recommendation:</strong>
+                        <p id="modal-recommendation">...</p>
+                    </div>
+                </div>
+                
+                <div class="report-section report-qa-section">
+                    <h3>Patient's Answers</h3>
+                    <ul id="modal-qa-container" class="report-qa-list">
+                        </ul>
+                </div>
+            </div>
+        </div>
+        </main>
 
     <script type="module" src="script.js" defer></script>
     <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
