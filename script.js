@@ -6,7 +6,7 @@ import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase
 // Auth imports (Email/Password, Remember Me, Forgot Password)
 import {
     getAuth,
-    createUserWithEmailAndPassword,
+    // createUserWithEmailAndPassword, // No longer needed
     signInWithEmailAndPassword,
     onAuthStateChanged,
     signOut,
@@ -472,7 +472,7 @@ let allAppointments = [];
 // UI selectors (Define these once if needed globally)
 const wrapper = document.querySelector('.wrapper');
 const loginlink = document.querySelector('.login-link');
-const regsiterlink = document.querySelector('.register-link');
+// const regsiterlink = document.querySelector('.register-link'); // No longer needed
 const iconClose = document.querySelector('.icon-close');
 const body = document.querySelector('body');
 const nav = document.getElementById('primary-navigation'); // Might be null
@@ -480,7 +480,7 @@ const navToggle = document.querySelector('.nav-toggle'); // Might be null
 const scrim = document.querySelector('.scrim'); // Might be null
 
 // Toggle login/register view
-if (regsiterlink && wrapper) regsiterlink.addEventListener('click', ()=> wrapper.classList.add('active'));
+// if (regsiterlink && wrapper) regsiterlink.addEventListener('click', ()=> wrapper.classList.add('active')); // No longer needed
 if (loginlink && wrapper) loginlink.addEventListener('click', ()=> wrapper.classList.remove('active'));
 
 // Close modal
@@ -529,7 +529,7 @@ function showScrim(show){
 // --- End Helper Functions ---
 
 
-// --- Login logic with persistence ---
+// --- Login logic with persistence (MODIFIED) ---
 const loginForm = document.querySelector('.form-box.login form');
 if (loginForm) {
     loginForm.addEventListener('submit', function(e) {
@@ -538,6 +538,13 @@ if (loginForm) {
         const password = document.getElementById('login-password').value;
         const rememberMeInput = document.querySelector('.form-box.login input[name="remember"]');
         const rememberMe = rememberMeInput ? rememberMeInput.checked : false;
+
+        // --- NEW: Admin-only check ---
+        if (email !== 'atchazoj6@gmail.com') {
+            alert('This email address is not authorized for login.');
+            return; // Stop the login process
+        }
+        // --- END: Admin-only check ---
 
         console.log("Remember Me:", rememberMe);
         const persistenceType = rememberMe ? browserLocalPersistence : browserSessionPersistence;
@@ -565,44 +572,9 @@ if (loginForm) {
     });
 }
 
-// --- Registration logic (with setting displayName) ---
-const registerForm = document.querySelector('.form-box.register form');
-if (registerForm) {
-     registerForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const email = document.getElementById('register-email').value;
-        const password = document.getElementById('register-password').value;
-        const username = document.getElementById('register-username').value; // Get username
-
-        createUserWithEmailAndPassword(auth, email, password)
-            .then((userCredential) => {
-                const user = userCredential.user;
-                console.log('Registered user:', user);
-                // Update profile with display name
-                return updateProfile(user, {
-                    displayName: username
-                });
-            })
-            .then(() => {
-                console.log('Display name set to:', username);
-                alert('Registration successful! Please login.');
-                if (wrapper) wrapper.classList.remove('active');
-            })
-            .catch((error) => {
-                const errorCode = error.code;
-                console.error("Registration error:", errorCode, error.message);
-                if (errorCode === 'auth/weak-password') {
-                    alert('The password is too weak (must be at least 6 characters).');
-                } else if (errorCode === 'auth/email-already-in-use') {
-                    alert('This email address is already in use.');
-                } else if (errorCode === 'auth/operation-not-allowed') {
-                     alert('Error setting display name. Please contact support.');
-                } else {
-                    alert(error.message);
-                }
-            });
-     });
-}
+// --- Registration logic (REMOVED) ---
+// const registerForm = document.querySelector('.form-box.register form');
+// ... all registration logic removed ...
 
 // --- Sidebar hidden nav toggle ---
 const sidebarHamburger = document.querySelector('.sidebar-header .hamburger-menu');
