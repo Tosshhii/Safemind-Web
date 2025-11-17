@@ -668,7 +668,7 @@ async function loadPatientProfile() {
         }
 
         // --- FETCH 2: Get Latest Prediction from 'api_predictions' ---
-        const predictionsRef = collection(db, "api_predictions");
+        const predictionsRef = collectionGroup(db, "api_predictions");
         const q = query(
             predictionsRef,
             where("userId", "==", patientId),    // Find reports for this user
@@ -706,55 +706,97 @@ async function loadPatientProfile() {
             if (modalSeverityPercent) modalSeverityPercent.textContent = displayPercent + '%';
             if (modalRecommendation) modalRecommendation.textContent = predictionData.recommendation || "No recommendation provided.";
 
-            // --- **** UPDATED Q&A LOGIC **** ---
+            
+            // --- **** NEW ROBUST Q&A LOGIC (Handles 3 formats) **** ---
             if (qaContainer) {
-                qaContainer.innerHTML = ''; // Clear any old data
-                
-                // Get the input_data map, or use the root document as a fallback
-                const answersData = predictionData.input_data || predictionData;
+                qaContainer.innerHTML = ''; // Clear old data
 
-                // Loop through all keys in the answers data
-                Object.keys(answersData)
-                    .filter(key => key.startsWith('text_') || key.startsWith('rating_')) // Get all 'text_' and 'rating_' keys
-                    .sort((a, b) => {
-                        // Sort keys numerically (e.g., rating_1, text_1, rating_2, text_2)
-                        const numA = parseInt(a.split('_')[1], 10);
-                        const numB = parseInt(b.split('_')[1], 10);
-                        if (numA !== numB) {
-                            return numA - numB;
-                        }
-                        // If number is same, put 'rating_' before 'text_'
-                        return a.localeCompare(b);
-                    })
-                    .forEach(key => {
-                        // Use the key (e.g., 'text_1') to get the question from our map
-                        const questionText = QUESTION_MAP[key] || key; // Use key as fallback
-                        const answer = answersData[key];
-                        
-                        // Create and append the HTML for this Q&A
-                        const item = document.createElement('li');
-                        item.className = 'qa-item';
-                        
-                        // --- NEW LOGIC: Check if it's a rating or text ---
-                        if (key.startsWith('rating_')) {
-                            item.innerHTML = `
-                                <strong>${questionText}</strong>
-                                <p class="rating-answer">Rating: <strong>${answer}</strong> / 5</p>
+                const ratingsArray = predictionData.ratings;
+                const textsArray = predictionData.texts;
+                const inputDataMap = predictionData.input_data;
+
+                // --- Format 1: New Array-Based (Good) ---
+                if (ratingsArray && Array.isArray(ratingsArray) && textsArray && Array.isArray(textsArray)) {
+                    console.log("Loading Q&A from [Array] format.");
+                    
+                    ratingsArray.forEach((ratingAnswer, index) => {
+                        const ratingKey = `rating_${index + 1}`;
+                        const ratingQuestion = QUESTION_MAP[ratingKey] || ratingKey;
+                        const ratingItem = document.createElement('li');
+                        ratingItem.className = 'qa-item';
+                        ratingItem.innerHTML = `
+                            <strong>${ratingQuestion}</strong>
+                            <p class="rating-answer">Rating: <strong>${ratingAnswer}</strong> / 5</p>
+                        `;
+                        qaContainer.appendChild(ratingItem);
+
+                        if (textsArray[index] !== undefined) {
+                            const textAnswer = textsArray[index];
+                            const textKey = `text_${index + 1}`;
+                            const textQuestion = QUESTION_MAP[textKey] || textKey;
+                            const textItem = document.createElement('li');
+                            textItem.className = 'qa-item';
+                            textItem.innerHTML = `
+                                <strong>${textQuestion}</strong>
+                                <p>${textAnswer}</p>
                             `;
-                        } else {
-                            item.innerHTML = `
-                                <strong>${questionText}</strong>
-                                <p>${answer}</p>
-                            `;
+                            qaContainer.appendChild(textItem);
                         }
-                        qaContainer.appendChild(item);
                     });
+                }
+                // --- Format 2: Old Map-Based (Good) ---
+                else if (inputDataMap && typeof inputDataMap === 'object') {
+                    console.log("Loading Q&A from [input_data] Map format.");
+                    console.log("The input_data is:", inputDataMap); 
+
+                    // --- NEW LOGIC TO HANDLE {answers: [], text: []} ---
+                    const ratingsArray = inputDataMap.answers; // <-- Key is 'answers'
+                    const textsArray = inputDataMap.texts;     // <-- Key is 'text'
+
+                    if (ratingsArray && Array.isArray(ratingsArray) && textsArray && Array.isArray(textsArray)) {
+                        
+                        ratingsArray.forEach((ratingAnswer, index) => {
+                            const ratingKey = `rating_${index + 1}`;
+                            const ratingQuestion = QUESTION_MAP[ratingKey] || ratingKey;
+                            const ratingItem = document.createElement('li');
+                            ratingItem.className = 'qa-item';
+                            ratingItem.innerHTML = `
+                                <strong>${ratingQuestion}</strong>
+                                <p class="rating-answer">Rating: <strong>${ratingAnswer}</strong> / 5</p>
+                            `;
+                            qaContainer.appendChild(ratingItem);
+
+                            if (textsArray[index] !== undefined) {
+                                const textAnswer = textsArray[index];
+                                const textKey = `text_${index + 1}`;
+                                const textQuestion = QUESTION_MAP[textKey] || textKey;
+                                const textItem = document.createElement('li');
+                                textItem.className = 'qa-item';
+                                textItem.innerHTML = `
+                                    <strong>${textQuestion}</strong>
+                                    <p>${textAnswer}</p>
+                                `;
+                                qaContainer.appendChild(textItem);
+                            }
+                        });
+
+                    } else {
+                        console.log("input_data was found, but 'answers' or 'text' arrays were missing.");
+                    }
+                    // --- END OF NEW LOGIC ---
+                }
+                
+                // --- Fallback ---
+                else {
+                    console.log("Q&A data is in an unrecognized format or missing.");
+                }
                 
                 if (qaContainer.children.length === 0) {
                     qaContainer.innerHTML = '<li>No Q&A data found for this report.</li>';
                 }
             }
-            // --- **** END OF UPDATED Q&A LOGIC **** ---
+            // --- **** END OF NEW ROBUST LOGIC **** ---
+
 
         } else {
             // This runs if the user exists but has no analysis reports
