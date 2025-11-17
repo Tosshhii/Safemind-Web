@@ -1019,6 +1019,29 @@ body.dashboard-page {
 .pending-section {
     margin-top: 20px;
 }
+/* Pending requests list */
+.pending-section .pending-list {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.pending-section .pending-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border: 1px solid #e6e6e6;
+    background: #fff;
+    border-radius: 8px;
+}
+.pending-section .pending-meta {
+    font-size: 1em;
+    color: #333;
+}
+.pending-section .pending-actions button {
+    margin-left: 8px;
+}
 .pending-toggle {
     background: none;
     border: none;

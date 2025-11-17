@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Admin check using the single allowed admin email (frontend already restricts login)
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'atchazoj6@gmail.com';
+    }
+
+    // Allow authenticated reads of api_predictions (keeps existing behavior)
+    match /{path=**}/api_predictions/{predictionId} {
+      allow read: if request.auth != null;
+    }
+
+    // bookedSlots (top-level) - public read, only admin may create/update/delete
+    match /bookedSlots/{docId} {
+      allow read: if true;                       // Calendar display remains publicly readable
+      allow create, update, delete: if isAdmin();
+    }
+
+    // also cover bookedSlots subcollections (if any) with same policy
+    match /{path=**}/bookedSlots/{docId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // consultationRequests - clients create requests; admin manages them
+    match /consultationRequests/{reqId} {
+      // Patients can create requests (with or without status field - default to 'pending')
+      allow create: if request.auth != null;
+      
+      // Admin can read all; patients can read their own
+      allow read: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+      
+      // Only admin can update (to confirm/decline)
+      allow update, delete: if isAdmin();
+    }
+
+    // users collection - allow authenticated reads; users may write their own profile
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update, delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
+    // Default: deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -32,6 +32,7 @@ import {
     doc,     
     getDoc,  
     limit  
+    , addDoc, updateDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js"; // <-- THIS WAS THE BROKEN LINE
 // --- END FIRESTORE IMPORTS ---
 
@@ -183,6 +184,7 @@ async function loadAppointments() {
         const q = query(
             collectionGroup(db, "bookedSlots"), 
             where("date", "==", todaysDateString), 
+            where("status", "==", "confirmed"),
             orderBy("time")
         );
 
@@ -249,6 +251,153 @@ async function loadAppointments() {
     }
 }
 // --- END UPDATED FUNCTION ---
+
+// --- Pending consultation requests (Admin confirmation) ---
+async function loadPendingRequests() {
+    const pendingContainer = document.querySelector('.pending-section');
+    if (!pendingContainer) return;
+
+    pendingContainer.innerHTML = '<h2>Pending Consultation Requests</h2><div class="pending-list">Loading...</div>';
+
+    try {
+        const reqCol = collection(db, 'consultationRequests');
+        // Get ALL requests and filter client-side (avoids needing status field on every doc)
+        const snapshot = await getDocs(reqCol);
+        console.log('All consultation requests found:', snapshot.size);
+        
+        // Filter for pending/unconfirmed requests (status == 'pending' OR status field missing)
+        const pendingDocs = snapshot.docs.filter(doc => {
+            const status = doc.data().status;
+            return status === 'pending' || status === undefined;
+        });
+        console.log('Pending requests after filter:', pendingDocs.length);
+
+        const listEl = pendingContainer.querySelector('.pending-list');
+        if (!pendingDocs.length) {
+            listEl.innerHTML = '<p>No pending consultation requests.</p>';
+            return;
+        }
+
+        const rows = await Promise.all(pendingDocs.map(async (reqDoc) => {
+            const req = reqDoc.data();
+            const patientId = req.userId || req.userUID || null;
+            let patientName = req.name || 'Unknown Patient';
+
+            if (patientId) {
+                try {
+                    const uRef = doc(db, 'users', patientId);
+                    const uSnap = await getDoc(uRef);
+                    if (uSnap.exists()) patientName = uSnap.data().name || patientName;
+                } catch (e) {
+                    console.error('Failed to fetch patient name for pending request', e);
+                }
+            }
+
+            const date = req.date || req.requestDate || '--/--/----';
+            const time = req.time || req.requestTime || '--:--';
+
+            return `
+                <div class="pending-item" data-request-id="${reqDoc.id}">
+                    <div class="pending-meta"><strong>${patientName}</strong> — ${date} ${time}</div>
+                    <div class="pending-actions">
+                        <button class="btn confirm-request">Confirm</button>
+                        <button class="btn decline-request" style="background:#e74c3c;border:none">Decline</button>
+                    </div>
+                </div>
+            `;
+        }));
+
+        listEl.innerHTML = rows.join('');
+
+        listEl.querySelectorAll('.confirm-request').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const item = e.target.closest('.pending-item');
+                const id = item.getAttribute('data-request-id');
+                await confirmRequest(id);
+            });
+        });
+        listEl.querySelectorAll('.decline-request').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const item = e.target.closest('.pending-item');
+                const id = item.getAttribute('data-request-id');
+                await declineRequest(id);
+            });
+        });
+
+    } catch (error) {
+        console.error('Error loading pending requests', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        const listEl = pendingContainer.querySelector('.pending-list');
+        if (listEl) {
+            if (error.code === 'failed-precondition') {
+                listEl.innerHTML = '<p>Database index required. Check F12 console for link.</p>';
+            } else if (error.code === 'permission-denied') {
+                listEl.innerHTML = '<p>Permission denied reading requests. Check Firestore rules.</p>';
+            } else {
+                listEl.innerHTML = '<p>Error loading pending requests.</p>';
+            }
+        }
+    }
+}
+
+async function confirmRequest(requestId) {
+    if (!confirm('Confirm this consultation and add to calendar?')) return;
+
+    try {
+        const reqRef = doc(db, 'consultationRequests', requestId);
+        const reqSnap = await getDoc(reqRef);
+        if (!reqSnap.exists()) return alert('Request not found.');
+
+        const req = reqSnap.data();
+
+        const booked = {
+            date: req.date,
+            time: req.time,
+            userId: req.userId || req.userUID || null,
+            status: 'confirmed',
+            createdAt: serverTimestamp(),
+            createdBy: auth.currentUser ? auth.currentUser.uid : null
+        };
+
+        await addDoc(collection(db, 'bookedSlots'), booked);
+
+        await updateDoc(reqRef, {
+            status: 'confirmed',
+            confirmedAt: serverTimestamp(),
+            confirmedBy: auth.currentUser ? auth.currentUser.uid : null
+        });
+
+        loadAppointments();
+        loadPendingRequests();
+
+        alert('Consultation confirmed and added to calendar.');
+    } catch (error) {
+        console.error('Error confirming request', error);
+        alert('Failed to confirm request. See console for details.');
+    }
+}
+
+async function declineRequest(requestId) {
+    const reason = prompt('Optional: enter a reason for declining (or leave empty):');
+    try {
+        const reqRef = doc(db, 'consultationRequests', requestId);
+        await updateDoc(reqRef, {
+            status: 'declined',
+            declinedAt: serverTimestamp(),
+            declinedBy: auth.currentUser ? auth.currentUser.uid : null,
+            declineReason: reason || ''
+        });
+
+        loadPendingRequests();
+        alert('Consultation request declined.');
+    } catch (error) {
+        console.error('Error declining request', error);
+        alert('Failed to decline request. See console for details.');
+    }
+}
+
+// --- End pending-request functions ---
 
 
 // --- (LATEST) Calendar state & functions ---
@@ -326,7 +475,8 @@ async function initializeCalendar() {
 
     try {
         // 2. Fetch all appointments
-        const q = query(collectionGroup(db, "bookedSlots"), orderBy("time"));
+        // Only show bookings that have been confirmed by an admin
+        const q = query(collectionGroup(db, "bookedSlots"), where('status', '==', 'confirmed'), orderBy("time"));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
@@ -808,6 +958,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (document.querySelector('.schedule-table-container')) {
         loadAppointments(); // Fetches data for dashboard
+        // Also load pending consultation requests that need admin confirmation
+        loadPendingRequests();
     }
     // --- END UPDATED ---
 
