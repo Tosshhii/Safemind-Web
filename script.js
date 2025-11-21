@@ -33,7 +33,7 @@ import {
     getDoc,  
     limit  
     , addDoc, updateDoc, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js"; // <-- THIS WAS THE BROKEN LINE
+} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js"; 
 // --- END FIRESTORE IMPORTS ---
 
 
@@ -287,7 +287,9 @@ async function loadPendingRequests() {
                 try {
                     const uRef = doc(db, 'users', patientId);
                     const uSnap = await getDoc(uRef);
-                    if (uSnap.exists()) patientName = uSnap.data().name || patientName;
+                    if (uSnap.exists()) {
+                        patientName = uSnap.data().name || patientName;
+                    }
                 } catch (e) {
                     console.error('Failed to fetch patient name for pending request', e);
                 }
@@ -309,13 +311,15 @@ async function loadPendingRequests() {
 
         listEl.innerHTML = rows.join('');
 
+        // Wire up confirm button
         listEl.querySelectorAll('.confirm-request').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const item = e.target.closest('.pending-item');
-                const id = item.getAttribute('data-request-id');
-                await confirmRequest(id);
+                const requestId = item.getAttribute('data-request-id');
+                await confirmRequest(requestId);
             });
         });
+        
         listEl.querySelectorAll('.decline-request').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const item = e.target.closest('.pending-item');
@@ -343,7 +347,7 @@ async function loadPendingRequests() {
 
 async function confirmRequest(requestId) {
     if (!confirm('Confirm this consultation and add to calendar?')) return;
-
+    
     try {
         const reqRef = doc(db, 'consultationRequests', requestId);
         const reqSnap = await getDoc(reqRef);
@@ -735,7 +739,7 @@ if (sidebarHamburger && hiddenNavItems.length > 0) {
     });
 }
 
-// --- **** (THIS IS THE UPDATED FUNCTION) **** ---
+// --- **** (THIS IS THE UPDATED FUNCTION with PERCENTAGE CALC) **** ---
 async function loadPatientProfile() {
     const urlParams = new URLSearchParams(window.location.search);
     const patientId = urlParams.get('id');
@@ -803,22 +807,29 @@ async function loadPatientProfile() {
         if (!querySnapshot.empty) {
             const predictionData = querySnapshot.docs[0].data();
             
-            // --- Logic for severity and gauge ---
-            const severityCategory = parseFloat(predictionData.severity_numeric) || 0;
+            // --- UPDATED Logic for severity and gauge ---
+            // 1. Get raw numeric score (e.g., 1.6, 2.8)
+            let rawScore = parseFloat(predictionData.severity_numeric);
+            if (isNaN(rawScore)) rawScore = 1.0;
+
+            // 2. Convert Scale: (1.0 - 3.0) to (0% - 100%)
+            // Formula: ((Score - 1.0) / 2.0) * 100
+            let calculatedPercent = ((rawScore - 1.0) / 2.0) * 100;
+
+            // 3. Clamp to ensure 0-100 range
+            calculatedPercent = Math.max(0, Math.min(100, calculatedPercent));
+
+            const displayPercent = Math.round(calculatedPercent);
             const severityText = predictionData.severity || 'unknown';
-            const categoryMap = {
-                "0.0": 15, "1.0": 35, "2.0": 65, "3.0": 85
-            };
-            const categoryString = severityCategory.toFixed(1);
-            const displayPercent = categoryMap[categoryString] || 10; 
             
             // --- Populate main page ---
             if (severityElement) severityElement.textContent = displayPercent + '%';
             if (severityTextElement) severityTextElement.textContent = severityText;
             if (descriptionElement) {
-                descriptionElement.innerHTML = `Based on SafeMind's analysis, the level of severity of the patient's depression is <strong>${severityText}</strong>, which indicates a <strong>${severityText}</strong> level of depression.`;
+                descriptionElement.innerHTML = `Based on SafeMind's analysis, the level of severity of the patient's depression is <strong>${displayPercent}%</strong> (${severityText}), which indicates a <strong>${severityText}</strong> level of depression.`;
             }
             if (needle) {
+                // -90deg is 0%, 90deg is 100%
                 let angle = ((displayPercent / 100) * 180) - 90;
                 needle.style.transform = `rotate(${angle}deg)`;
             }
@@ -866,46 +877,36 @@ async function loadPatientProfile() {
                         }
                     });
                 }
-                // --- Format 2: Old Map-Based (Good) ---
+                // --- Format 2: Old Map-Based (FIXED) ---
                 else if (inputDataMap && typeof inputDataMap === 'object') {
-                    console.log("Loading Q&A from [input_data] Map format.");
+                    console.log("Loading Q&A from [input_data] Map format (FIXED LOGIC).");
                     console.log("The input_data is:", inputDataMap); 
+                    
+                    // NEW/FIXED LOGIC: Iterate through the question map and look for the key in the inputDataMap
+                    for (const key in QUESTION_MAP) {
+                        if (inputDataMap.hasOwnProperty(key)) {
+                            const question = QUESTION_MAP[key];
+                            const answer = inputDataMap[key];
+                            const item = document.createElement('li');
+                            item.className = 'qa-item';
 
-                    // --- NEW LOGIC TO HANDLE {answers: [], text: []} ---
-                    const ratingsArray = inputDataMap.answers; // <-- Key is 'answers'
-                    const textsArray = inputDataMap.texts;     // <-- Key is 'text'
-
-                    if (ratingsArray && Array.isArray(ratingsArray) && textsArray && Array.isArray(textsArray)) {
-                        
-                        ratingsArray.forEach((ratingAnswer, index) => {
-                            const ratingKey = `rating_${index + 1}`;
-                            const ratingQuestion = QUESTION_MAP[ratingKey] || ratingKey;
-                            const ratingItem = document.createElement('li');
-                            ratingItem.className = 'qa-item';
-                            ratingItem.innerHTML = `
-                                <strong>${ratingQuestion}</strong>
-                                <p class="rating-answer">Rating: <strong>${ratingAnswer}</strong> / 5</p>
-                            `;
-                            qaContainer.appendChild(ratingItem);
-
-                            if (textsArray[index] !== undefined) {
-                                const textAnswer = textsArray[index];
-                                const textKey = `text_${index + 1}`;
-                                const textQuestion = QUESTION_MAP[textKey] || textKey;
-                                const textItem = document.createElement('li');
-                                textItem.className = 'qa-item';
-                                textItem.innerHTML = `
-                                    <strong>${textQuestion}</strong>
-                                    <p>${textAnswer}</p>
+                            if (key.startsWith('rating')) {
+                                // This is a rating answer
+                                item.innerHTML = `
+                                    <strong>${question}</strong>
+                                    <p class="rating-answer">Rating: <strong>${answer}</strong> / 5</p>
                                 `;
-                                qaContainer.appendChild(textItem);
+                            } else {
+                                // This is a text answer
+                                item.innerHTML = `
+                                    <strong>${question}</strong>
+                                    <p>${answer}</p>
+                                `;
                             }
-                        });
-
-                    } else {
-                        console.log("input_data was found, but 'answers' or 'text' arrays were missing.");
+                            qaContainer.appendChild(item);
+                        }
                     }
-                    // --- END OF NEW LOGIC ---
+
                 }
                 
                 // --- Fallback ---
