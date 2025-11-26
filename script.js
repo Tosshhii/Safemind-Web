@@ -739,7 +739,7 @@ if (sidebarHamburger && hiddenNavItems.length > 0) {
     });
 }
 
-// --- **** (THIS IS THE UPDATED FUNCTION with PERCENTAGE CALC) **** ---
+// --- **** (THIS IS THE UPDATED FUNCTION with PERCENTAGE CALC & NEW Q&A) **** ---
 async function loadPatientProfile() {
     const urlParams = new URLSearchParams(window.location.search);
     const patientId = urlParams.get('id');
@@ -840,81 +840,72 @@ async function loadPatientProfile() {
             if (modalRecommendation) modalRecommendation.textContent = predictionData.recommendation || "No recommendation provided.";
 
             
-            // --- **** NEW ROBUST Q&A LOGIC (Handles 3 formats) **** ---
+            // --- **** NEW ROBUST Q&A LOGIC (Universal Adapter) **** ---
             if (qaContainer) {
                 qaContainer.innerHTML = ''; // Clear old data
 
-                const ratingsArray = predictionData.ratings;
-                const textsArray = predictionData.texts;
-                const inputDataMap = predictionData.input_data;
+                let finalRatings = [];
+                let finalTexts = [];
+                const inputData = predictionData.input_data || {};
 
-                // --- Format 1: New Array-Based (Good) ---
-                if (ratingsArray && Array.isArray(ratingsArray) && textsArray && Array.isArray(textsArray)) {
-                    console.log("Loading Q&A from [Array] format.");
-                    
-                    ratingsArray.forEach((ratingAnswer, index) => {
-                        const ratingKey = `rating_${index + 1}`;
-                        const ratingQuestion = QUESTION_MAP[ratingKey] || ratingKey;
-                        const ratingItem = document.createElement('li');
-                        ratingItem.className = 'qa-item';
-                        ratingItem.innerHTML = `
-                            <strong>${ratingQuestion}</strong>
-                            <p class="rating-answer">Rating: <strong>${ratingAnswer}</strong> / 5</p>
+                // SOURCE A: Top-Level Arrays (New AI Backend)
+                if (predictionData.ratings && Array.isArray(predictionData.ratings)) {
+                    finalRatings = predictionData.ratings;
+                    finalTexts = predictionData.texts || [];
+                }
+                // SOURCE B: Mobile App Input (Nested 'answers' array)
+                else if (inputData.answers && Array.isArray(inputData.answers)) {
+                    finalRatings = inputData.answers;
+                    finalTexts = inputData.texts || [];
+                }
+                // SOURCE C: Web App Input (Key-Value pairs 'rating_1', etc.)
+                else {
+                    for (let i = 1; i <= 10; i++) {
+                        if (inputData[`rating_${i}`]) {
+                            finalRatings.push(inputData[`rating_${i}`]);
+                            finalTexts.push(inputData[`text_${i}`] || "");
+                        }
+                    }
+                }
+
+                // 2. Render the Data
+                if (finalRatings.length > 0) {
+                    finalRatings.forEach((rating, index) => {
+                        // Map index (0-9) to Question Key (rating_1..10)
+                        const qNum = index + 1;
+                        const questionKey = `rating_${qNum}`;
+                        const questionLabel = QUESTION_MAP[questionKey] || `Question ${qNum}`;
+                        
+                        // Create List Item
+                        const item = document.createElement('li');
+                        item.className = 'qa-item';
+                        item.innerHTML = `
+                            <strong>Q${qNum}: ${questionLabel}</strong>
+                            <p class="rating-answer">Rating: <span class="highlight">${rating} / 5</span></p>
                         `;
-                        qaContainer.appendChild(ratingItem);
+                        qaContainer.appendChild(item);
 
-                        if (textsArray[index] !== undefined) {
-                            const textAnswer = textsArray[index];
-                            const textKey = `text_${index + 1}`;
-                            const textQuestion = QUESTION_MAP[textKey] || textKey;
-                            const textItem = document.createElement('li');
-                            textItem.className = 'qa-item';
+                        // Append Text Context if it exists
+                        if (finalTexts[index] && finalTexts[index].trim() !== "") {
+                            const textItem = document.createElement('div');
+                            textItem.className = 'qa-text-context';
+                            textItem.style.marginTop = "5px";
+                            textItem.style.marginBottom = "15px";
+                            textItem.style.paddingLeft = "15px";
+                            textItem.style.borderLeft = "3px solid #eee";
+                            textItem.style.color = "#555";
+                            
+                            const textKey = `text_${qNum}`;
+                            const textLabel = QUESTION_MAP[textKey] || "Context";
+                            
                             textItem.innerHTML = `
-                                <strong>${textQuestion}</strong>
-                                <p>${textAnswer}</p>
+                                <small><em>${textLabel}</em></small><br>
+                                "${finalTexts[index]}"
                             `;
                             qaContainer.appendChild(textItem);
                         }
                     });
-                }
-                // --- Format 2: Old Map-Based (FIXED) ---
-                else if (inputDataMap && typeof inputDataMap === 'object') {
-                    console.log("Loading Q&A from [input_data] Map format (FIXED LOGIC).");
-                    console.log("The input_data is:", inputDataMap); 
-                    
-                    // NEW/FIXED LOGIC: Iterate through the question map and look for the key in the inputDataMap
-                    for (const key in QUESTION_MAP) {
-                        if (inputDataMap.hasOwnProperty(key)) {
-                            const question = QUESTION_MAP[key];
-                            const answer = inputDataMap[key];
-                            const item = document.createElement('li');
-                            item.className = 'qa-item';
-
-                            if (key.startsWith('rating')) {
-                                // This is a rating answer
-                                item.innerHTML = `
-                                    <strong>${question}</strong>
-                                    <p class="rating-answer">Rating: <strong>${answer}</strong> / 5</p>
-                                `;
-                            } else {
-                                // This is a text answer
-                                item.innerHTML = `
-                                    <strong>${question}</strong>
-                                    <p>${answer}</p>
-                                `;
-                            }
-                            qaContainer.appendChild(item);
-                        }
-                    }
-
-                }
-                
-                // --- Fallback ---
-                else {
-                    console.log("Q&A data is in an unrecognized format or missing.");
-                }
-                
-                if (qaContainer.children.length === 0) {
+                } else {
                     qaContainer.innerHTML = '<li>No Q&A data found for this report.</li>';
                 }
             }
@@ -1041,7 +1032,7 @@ document.addEventListener('DOMContentLoaded', function() {
             sendPasswordResetEmail(auth, email)
                 .then(() => {
                     alert('Password reset email sent! Please check your inbox (and spam folder).');
-                     closeOverlays();
+                      closeOverlays();
                 })
                 .catch((error) => {
                     const errorCode = error.code;
