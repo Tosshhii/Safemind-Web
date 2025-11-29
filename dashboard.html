@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SafeMind - Dashboard</title>
-    <link rel="stylesheet" href="stylesheet.css?v=5"> 
+    <title>SafeMind - Confirmed Consultations</title>
+    <link rel="stylesheet" href="stylesheet.css?v=5">
 </head>
 
 <body class="dashboard-page">
@@ -20,21 +19,17 @@
             <div class="user-avatar">
                 <ion-icon name="person-circle"></ion-icon>
             </div>
-            
             <div class="profile-dropdown">
                 <div class="profile-info">
                     <ion-icon name="person-circle-outline"></ion-icon>
                     <span id="user-email-display">loading...</span>
                 </div>
                 <ul class="profile-menu">
-                    <li><a href="#" id="logout-button">
-                        <ion-icon name="log-out-outline"></ion-icon>
-                        Logout
-                    </a></li>
+                    <li><a href="#" id="logout-button"><ion-icon name="log-out-outline"></ion-icon>Logout</a></li>
                 </ul>
             </div>
-            </div>
-        </header>
+        </div>
+    </header>
 
     <nav class="dashboard-sidebar">
         <div class="sidebar-header">
@@ -45,14 +40,20 @@
         <ul class="sidebar-nav">
             <li class="nav-item hidden"><a href="index.html">Home</a></li>
             <li class="nav-item hidden"><a href="about.html">About Us</a></li>
-            <li><a href="dashboard.html" class="active">Dashboard</a></li>
+            
+            <li><div class="sidebar-category">Consultations</div></li>
+            
+            <li><a href="pending-requests.html" class="sub-link">Pending Requests</a></li>
+            
+            <li><a href="confirmed-consultations.html" class="sub-link active-sub">Confirmed Consultations</a></li>
+
             <li><a href="calendar.html">Calendar</a></li>
         </ul>
     </nav>
 
     <main class="dashboard-main">
         <div class="dashboard-content">
-            <h1 class="dashboard-title">Today's Schedule</h1>
+            <h1 class="dashboard-title">Confirmed Consultations</h1>
             
             <div class="schedule-table-container">
                 <table class="schedule-table">
@@ -63,13 +64,9 @@
                             <th>Patient</th>
                         </tr>
                     </thead>
-                    
                     <tbody id="schedule-table-body">
                         </tbody>
-                    </table>
-            </div>
-
-            <div class="pending-section">
+                </table>
             </div>
         </div>
     </main>
@@ -78,5 +75,4 @@
     <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
 </body>
-
 </html>

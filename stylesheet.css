@@ -1840,4 +1840,40 @@ img {
     font-size: 1.2em;
     color: #0056b3;
 }
-/* --- **** END OF NEW STYLE **** --- */
+
+
+/* --- NEW SIDEBAR STYLES --- */
+
+/* The main category header (Consultations) */
+.sidebar-category {
+    padding: 15px 20px;
+    background-color: #eee;
+    color: #333;
+    font-weight: 700;
+    font-size: 1em;
+    border-bottom: 1px solid #e0e0e0;
+    display: block;
+    user-select: none; /* Prevent text selection */
+}
+
+/* The sub-links (Pending/Confirmed) */
+.sidebar-nav a.sub-link {
+    padding-left: 40px; /* Indent the sub-items */
+    font-size: 0.95em;
+    border-bottom: 1px solid #f0f0f0;
+    background-color: #fff;
+    color: #555;
+}
+
+.sidebar-nav a.sub-link:hover {
+    background-color: #f8f9fa;
+    color: #007bff;
+}
+
+/* Active state for sub-links */
+.sidebar-nav a.sub-link.active-sub {
+    color: #007bff;
+    font-weight: 600;
+    background-color: #eef7ff;
+    border-left: 4px solid #007bff;
+}
