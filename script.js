@@ -135,9 +135,14 @@ function parseDateTime(dateStr, timeStr) {
     let hour = 0;
     if (timeStr && typeof timeStr === 'string') {
         const start = timeStr.split('-')[0].trim(); 
+        const isPM = start.toLowerCase().includes('pm');
+        const isAM = start.toLowerCase().includes('am');
+
         const tParts = start.split(':');
         if (tParts.length >= 1) hour = parseInt(tParts[0], 10);
-        if (hour >= 1 && hour <= 6) hour += 12;
+
+        if (isPM && hour < 12) hour += 12;
+        if (isAM && hour === 12) hour = 0;
     }
     return new Date(year, month, day, hour);
 }
@@ -409,12 +414,22 @@ function renderWeeklyCalendar(date) {
 }
 
 function normalizeStartTime(timeStr) {
-    const parts = timeStr.split(':');
+    const isPM = timeStr.toLowerCase().includes('pm');
+    const isAM = timeStr.toLowerCase().includes('am');
+
+    // Clean AM/PM from the string to parse numbers
+    const cleanTimeStr = timeStr.replace(/am|pm/gi, '').trim();
+
+    const parts = cleanTimeStr.split(':');
     if (parts.length !== 2) return null;
     let hour = parseInt(parts[0], 10);
-    const minute = parts[1];
+    let minute = parts[1].trim(); // trim potential spaces
+
     if (isNaN(hour)) return null;
-    if (hour >= 1 && hour <= 6) hour += 12;
+
+    if (isPM && hour < 12) hour += 12;
+    if (isAM && hour === 12) hour = 0;
+
     return `${String(hour).padStart(2, '0')}:${minute}`;
 }
 
