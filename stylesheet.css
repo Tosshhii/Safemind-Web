@@ -1533,132 +1533,161 @@ img {
 
 /* ---
 ---
---- NEW CALENDAR STYLLES ---
+--- MODERN CALENDAR STYLES ---
 --- (Replaces all old calendar styles) ---
 ---
 --- */
 
 .calendar-content {
     background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     padding: 30px;
+    border: 1px solid #e0e0e0;
 }
 
 .calendar-grid {
     width: 100%;
     position: relative;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
 }
 
 /* Calendar Header (MON 17, TUE 18...) */
 .calendar-header {
     display: grid;
-    /* 100px for time column, 7 days */
-    grid-template-columns: 100px repeat(7, 1fr); 
-    border: 1px solid #e0e0e0;
-    border-radius: 8px 8px 0 0;
-    overflow: hidden;
-}
-.time-column, .day-header {
+    grid-template-columns: 80px repeat(7, 1fr);
     background-color: #f8f9fa;
-    padding: 15px;
-    font-weight: 600;
-    color: #333;
-    text-align: center;
+    border-bottom: 1px solid #ddd;
 }
+
+.time-column {
+    padding: 15px;
+    border-right: 1px solid #ddd;
+    background-color: #fff;
+}
+
 .day-header {
-    border-left: 1px solid #e0e0e0;
+    padding: 15px 5px;
+    font-weight: 700;
+    color: #444;
+    text-align: center;
+    border-right: 1px solid #eee;
+    font-size: 0.95em;
+    background-color: #f8f9fa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.day-header:last-child {
+    border-right: none;
 }
 
 /* Calendar Body (The grid) */
 .calendar-body {
     display: grid;
-    /* 100px for time column, 7 days */
-    grid-template-columns: 100px repeat(7, 1fr); 
-    /* **** THIS IS THE CHANGED LINE (10 rows) **** */
-    grid-template-rows: repeat(10, 60px); 
-    border: 1px solid #e0e0e0;
-    border-top: none;
-    border-radius: 0 0 8px 8px;
-    position: relative; /* For placing appointments */
+    grid-template-columns: 80px repeat(7, 1fr);
+    grid-template-rows: repeat(10, 70px); /* Taller rows for better readability */
+    position: relative;
+    background-color: #fff;
+    overflow-y: auto;
 }
 
-/* Time labels (7 AM, 8 AM...) */
+/* Time labels (8 AM, 9 AM...) */
 .time-label {
-    grid-column: 1; /* Always in the first column */
+    grid-column: 1;
     padding: 10px;
     font-weight: 500;
-    color: #555;
-    text-align: right;
-    border-right: 1px solid #e0e0e0;
-    border-bottom: 1px solid #e0e0e0;
-    font-size: 0.9em;
-}
-.time-label:last-of-type {
-    border-bottom: none;
+    color: #888;
+    text-align: center;
+    border-right: 1px solid #ddd;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Day background cells (the vertical lines) */
 .day-bg-col {
-    border-left: 1px solid #e0e0e0;
+    border-right: 1px solid #f0f0f0;
     grid-row: 1 / -1; /* Span all rows */
-    background-image: linear-gradient(to bottom, #e0e0e0 1px, transparent 1px);
-    background-size: 100% 60px; /* Match row height */
+    /* Dotted lines for hours */
+    background-image: linear-gradient(to bottom, #f0f0f0 1px, transparent 1px);
+    background-size: 100% 70px; /* Match row height */
+}
+.day-bg-col:last-child {
+    border-right: none;
 }
 
 /* Placed Appointments */
 .appointment {
     position: absolute;
-    margin-left: 5px;
-    margin-right: 5px;
-    
-    /* We use CSS variables set from JS */
+    margin: 4px;
     grid-column: var(--col-start);
     grid-row: var(--row-start) / var(--row-end);
-    
-    overflow: hidden;
-    z-index: 1; /* Place above grid lines */
+    z-index: 10;
+    height: calc(100% - 8px); /* Account for margin */
+    width: calc(100% - 8px);
 }
 
 .patient-appointment {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     width: 100%;
     height: 100%;
     background-color: #e3f2fd;
-    border: 1px solid #bbdefb;
+    border-left: 4px solid #2196f3;
     border-radius: 4px;
-    padding: 4px 8px; /* <-- CHANGED */
-    box-sizing: border-box;
-    
-    color: #01579b;
+    padding: 6px 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    color: #333;
     text-decoration: none;
-    font-weight: 500;
-    font-size: 0.85em; /* <-- CHANGED */
+    font-size: 0.9em;
+    transition: all 0.2s ease;
+    overflow: hidden;
+}
 
-    /* --- **** NEW TEXT OVERFLOW RULES **** --- */
+.patient-appointment:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    background-color: #fff;
+    border-color: #1976d2;
+}
+
+.patient-appointment strong {
+    font-weight: 700;
+    display: block;
+    margin-bottom: 2px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-.patient-appointment:hover {
-    background-color: #bbdefb;
-}
-.patient-appointment .appt-time {
-    display: block;
-    font-weight: 600;
-    margin-top: 2px;
-    font-size: 0.9em; /* <-- CHANGED */
+    font-size: 1em;
 }
 
-/* Multi-color hues */
-.appointment:nth-of-type(3n-2) .patient-appointment {
-  background-color: #e3f2fd; color: #01579b; border-color: #bbdefb;
+.patient-appointment .appt-time {
+    display: block;
+    font-size: 0.85em;
+    color: #666;
 }
-.appointment:nth-of-type(3n-1) .patient-appointment {
-  background-color: #b3e5fc; color: #01579b; border-color: #81d4fa;
+
+/* Color variations for appointments */
+.appointment:nth-of-type(4n-3) .patient-appointment {
+    background-color: #e8f5e9;
+    border-left-color: #4caf50;
 }
-.appointment:nth-of-type(3n) .patient-appointment {
-  background-color: #b6dfff; color: #01579b; border-color: #82cfff;
+.appointment:nth-of-type(4n-2) .patient-appointment {
+    background-color: #fff3e0;
+    border-left-color: #ff9800;
+}
+.appointment:nth-of-type(4n-1) .patient-appointment {
+    background-color: #f3e5f5;
+    border-left-color: #9c27b0;
+}
+.appointment:nth-of-type(4n) .patient-appointment {
+    background-color: #e3f2fd;
+    border-left-color: #2196f3;
 }
 
 /* Calendar controls */
