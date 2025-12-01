@@ -621,11 +621,15 @@ let currentViewDate = new Date();
 // --- **** TIME CHANGE #1: New 8am-6pm map **** ---
 // This maps our database time (08:00) to a grid row number (1)
 const timeToRow = {
+    // 24-hour format
     '08:00': 1, '09:00': 2, '10:00': 3, '11:00': 4, '12:00': 5,
-    '13:00': 6, '14:00': 7, '15:00': 8, '16:00': 9, '17:00': 10
+    '13:00': 6, '14:00': 7, '15:00': 8, '16:00': 9, '17:00': 10, '18:00': 11,
+    
+    // 12-hour format handling (maps 1-6 to the afternoon rows)
+    '01:00': 6, '02:00': 7, '03:00': 8, '04:00': 9, '05:00': 10, '06:00': 11
 };
 // --- **** TIME CHANGE #2: New 8am-5pm labels (for 10 slots) **** ---
-const timeSlots = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+const timeSlots = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00' ,'18:00'];
 
 // This function now *only* draws the background grid and labels
 function renderWeeklyCalendar(date) {
