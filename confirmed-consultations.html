@@ -44,8 +44,8 @@
             <li><div class="sidebar-category">Consultations</div></li>
             
             <li><a href="pending-requests.html" class="sub-link">Pending Requests</a></li>
-            
             <li><a href="confirmed-consultations.html" class="sub-link active-sub">Confirmed Consultations</a></li>
+            <li><a href="user-profiles.html" class="sub-link">User Profiles</a></li>
 
             <li><a href="calendar.html">Calendar</a></li>
         </ul>
@@ -54,7 +54,15 @@
     <main class="dashboard-main">
         <div class="dashboard-content">
             <h1 class="dashboard-title">Confirmed Consultations</h1>
-            
+
+            <div class="table-toolbar">
+                <label for="confirmed-sort">Sort by:</label>
+                <select id="confirmed-sort" class="table-sort-select">
+                    <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                </select>
+            </div>
+
             <div class="schedule-table-container">
                 <table class="schedule-table">
                     <thead>

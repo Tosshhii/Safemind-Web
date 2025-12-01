@@ -1,35 +1,41 @@
 // --- START: Firebase v12 (Modular) Initialization ---
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
 
-// Auth imports
+// Auth imports (Email/Password, Remember Me, Forgot Password)
 import {
     getAuth,
+    // createUserWithEmailAndPassword, // No longer needed
     signInWithEmailAndPassword,
     onAuthStateChanged,
     signOut,
+    updateProfile,
+    // "Remember Me" functions:
     setPersistence,
     browserSessionPersistence,
     browserLocalPersistence,
+    inMemoryPersistence,
+    // Forgot Password
     sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 
-// Firestore imports
+// --- (UPDATED) FIRESTORE IMPORTS ---
 import { 
     getFirestore, 
     collection, 
-    collectionGroup, 
+    collectionGroup, // For our nested query
     getDocs,
     query,
     orderBy,
-    where, 
+    where, // Added for dashboard query
     doc,     
     getDoc,  
-    limit, 
-    addDoc, 
-    updateDoc, 
-    serverTimestamp
+    limit  
+    , addDoc, updateDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js"; 
+// --- END FIRESTORE IMPORTS ---
+
 
 // Your Firebase Configuration
 const firebaseConfig = {
@@ -42,62 +48,93 @@ const firebaseConfig = {
   measurementId: "G-GMJ1ZME9PP"
 };
 
+// --- CORRECTED INITIALIZATION ORDER ---
 // 1. Initialize the app
 const app = initializeApp(firebaseConfig);
+
+// 2. Get services *from* the app
 const auth = getAuth(app);
 const analytics = getAnalytics(app);
-const db = getFirestore(app); 
+const db = getFirestore(app); // Initialize Firestore
+// --- END: Firebase Initialization ---
 
-// --- QUESTION MAP ---
+
+// --- **** NEW QUESTION MAP (FROM YOUR LIST) **** ---
 const QUESTION_MAP = {
+    // Section 1
     "rating_1": "I easily get irritated or frustrated with others.",
     "rating_2": "I have little interest or pleasure in doing things I used to enjoy.",
     "text_1": "How would you describe your emotional state during the past two weeks?",
     "text_2": "What situations or experiences make you feel most hopeless or disinterested?",
+    // Section 2
     "rating_3": "I avoid situations that make me feel anxious.",
     "rating_4": "I frequently feel nervous, anxious, or on edge.",
     "text_3": "What kinds of things make you feel anxious or worried, and how do you handle them?",
     "text_4": "How has the anxiety affected your daily activities or interactions with others?",
+    // Section 3
     "rating_5": "I start more projects or take more risks than usual.",
     "rating_6": "I sleep less but still have a lot of energy.",
     "text_5": "Can you describe times when you felt unusually energetic or driven to take on new activities?",
     "text_6": "How do these changes in energy or activity level affect your relationships or responsibilities?",
+    // Section 4
     "rating_7": "I experience unexplained aches or pains such as headaches, back pain, or stomach pain.",
     "rating_8": "I feel my medical problems or symptoms are not taken seriously enough by others.",
     "text_7": "Have you noticed any recurring physical discomfort (such as headaches or body pain)? What do you think causes them?",
     "text_8": "How do your physical sensations or health concerns influence your emotions or thoughts?",
+    // Section 5
     "rating_9": "I have trouble sleeping, or my sleep does not feel restful.",
     "rating_10": "I often feel too tired to complete my usual tasks.",
     "text_9": "How has your sleep pattern changed recently, and what do you think is affecting it?",
     "text_10": "What do you notice about your energy or motivation during the day?"
 };
+// --- **** END OF NEW MAP **** ---
 
-// --- AUTH LISTENER ---
+
+// --- (UPDATED) Auth State Listener ---
 onAuthStateChanged(auth, (user) => {
+    // Get references to header elements
     const navActionLink = document.getElementById('nav-action-link');
     const navHomeLink = document.getElementById('nav-home-link');
 
     if (user) {
-        // Logged In
-        const emailDisplay = document.getElementById('user-email-display');
-        if (emailDisplay) emailDisplay.textContent = user.displayName || user.email;
+        // --- User is LOGGED IN ---
+        console.log('User logged in:', user.displayName || user.email);
 
+        // Update dashboard dropdown if it exists
+        const emailDisplay = document.getElementById('user-email-display');
+        if (emailDisplay) {
+            emailDisplay.textContent = user.displayName || user.email; // Prioritize displayName
+        }
+
+        // Update header nav link/button on landing/about pages
         if (navActionLink) {
             navActionLink.textContent = 'Dashboard';
+            // --- FIX: Redirect to Confirmed Page by default ---
             navActionLink.href = 'confirmed-consultations.html'; 
-            navActionLink.onclick = null;
+            navActionLink.onclick = null; // Remove popup click handler
             navActionLink.style.display = 'inline-flex';
+            
+            // Make the button visible AFTER setting its content
             navActionLink.style.visibility = 'visible'; 
         }
-        if (navHomeLink) navHomeLink.href = 'index.html';
+        if (navHomeLink) {
+             navHomeLink.href = 'index.html'; // Keep Home pointing to index
+        }
 
     } else {
-        // Logged Out
+        // --- User is LOGGED OUT ---
+        console.log('No user signed in.');
+
+        // Update header nav link/button on landing/about pages
         if (navActionLink) {
             navActionLink.textContent = 'Login';
             navActionLink.href = '#';
             navActionLink.style.display = 'inline-flex';
+
+            // Make the button visible AFTER setting its content
             navActionLink.style.visibility = 'visible'; 
+
+            // Add click handler to open the modal
             navActionLink.onclick = (e) => {
                 e.preventDefault();
                 const wrapper = document.querySelector('.wrapper');
@@ -109,20 +146,25 @@ onAuthStateChanged(auth, (user) => {
                 }
             };
         }
-        if (navHomeLink) navHomeLink.href = 'index.html';
+        if (navHomeLink) {
+            navHomeLink.href = 'index.html';
+        }
 
+        // --- Redirect check for protected pages ---
         const path = window.location.pathname;
-        const publicPages = ['index.html', 'about.html', '/', ''];
-        const isPublic = publicPages.some(p => path.endsWith(p));
-
-        if (!isPublic && !path.includes('index.html')) {
-            console.log('Access denied. Redirecting.');
+        const onAuthPage = path.endsWith('index.html') || path === '/' || path.endsWith('about.html');
+        // Only redirect if NOT on an auth page and NOT in the middle of login
+        if (!onAuthPage && !path.includes('index.html')) {
+            console.log('Access denied. Redirecting to login.');
             window.location.href = 'index.html';
         }
     }
 });
+// --- END: Auth State Listener ---
 
-// --- HELPER: Date Parser ---
+
+// --- NEW HELPER: Parse "DD/MM/YYYY" and times like "4:00-6:00" or "4:00 PM-6:00 PM" ---
+// This ensures sorting works for your specific string format, with optional AM/PM
 function parseDateTime(dateStr, timeStr) {
     if (!dateStr || typeof dateStr !== 'string') return new Date(0);
     const parts = dateStr.split('/');
@@ -134,11 +176,12 @@ function parseDateTime(dateStr, timeStr) {
     
     let hour = 0;
     if (timeStr && typeof timeStr === 'string') {
+        // Extract start time from "4:00-6:00" or "4:00 PM-6:00 PM" -> "4:00" or "4:00 PM"
         const start = timeStr.split('-')[0].trim(); 
         const isPM = start.toLowerCase().includes('pm');
         const isAM = start.toLowerCase().includes('am');
 
-        const tParts = start.split(':');
+        const tParts = start.replace(/am|pm/gi, '').trim().split(':');
         if (tParts.length >= 1) hour = parseInt(tParts[0], 10);
 
         if (isPM && hour < 12) hour += 12;
@@ -146,16 +189,26 @@ function parseDateTime(dateStr, timeStr) {
     }
     return new Date(year, month, day, hour);
 }
+// --- END NEW HELPER ---
 
-// --- FUNCTION 1: LOAD CONFIRMED APPOINTMENTS (TABLE) ---
+
+let confirmedSortMode = 'newest'; // 'newest' | 'oldest'
+
+// --- (UPDATED) Load appointments for Confirmed Consultations Page ---
 async function loadAppointments() {
     const tableBody = document.getElementById('schedule-table-body');
-    if (!tableBody) return; 
+    if (!tableBody) return; // Stop if we're not on the confirmed page
 
     tableBody.innerHTML = '<tr><td colspan="3">Loading confirmed consultations...</td></tr>';
     
     try {
-        const q = query(collectionGroup(db, "bookedSlots"), where("status", "==", "confirmed"));
+        // 1. Get ALL bookings where status is "confirmed"
+        const q = query(
+            collectionGroup(db, "bookedSlots"), 
+            where("status", "==", "confirmed")
+        );
+
+        // 2. Fetch the documents
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
@@ -163,31 +216,51 @@ async function loadAppointments() {
             return;
         }
 
+        // 3. Map docs to objects and create a sortable Date
         const appointments = querySnapshot.docs.map(doc => {
             const data = doc.data();
+            // Prefer createdAt timestamp if available, otherwise fall back to date/time fields
+            let sortDate;
+            if (data.createdAt && typeof data.createdAt.toMillis === 'function') {
+                sortDate = new Date(data.createdAt.toMillis());
+            } else {
+                sortDate = parseDateTime(data.date, data.time);
+            }
             return {
                 id: doc.id,
                 ...data,
-                sortDate: parseDateTime(data.date, data.time) 
+                sortDate 
             };
         });
 
-        // Sort Ascending (Oldest First)
-        appointments.sort((a, b) => a.sortDate - b.sortDate);
+        // 4. Sort according to current mode
+        if (confirmedSortMode === 'oldest') {
+            appointments.sort((a, b) => a.sortDate - b.sortDate);
+        } else { // default: newest first
+            appointments.sort((a, b) => b.sortDate - a.sortDate);
+        }
 
-        const htmlPromises = appointments.map(async (appt) => {
+        // 5. Create promises for each appointment to fetch user data
+        const appointmentPromises = appointments.map(async (appt) => {
             const patientId = appt.userId;
             let patientName = "Unknown Patient";
             let patientURL = '#';
 
             if (patientId) {
                 try {
-                    const uSnap = await getDoc(doc(db, 'users', patientId));
-                    if (uSnap.exists()) patientName = uSnap.data().name || "Unknown Patient";
-                } catch (e) { console.error(e); }
+                    const userDocRef = doc(db, 'users', patientId); // 'doc' is imported
+                    const userDocSnap = await getDoc(userDocRef);
+
+                    if (userDocSnap.exists()) {
+                        patientName = userDocSnap.data().name || "Unknown Patient";
+                    }
+                } catch (userError) {
+                    console.error("Error fetching patient name for", patientId, userError);
+                }
                 patientURL = `patient-profile.html?id=${encodeURIComponent(patientId)}`;
             }
 
+            // Return the HTML row for this appointment
             return `
                 <tr>
                     <td data-label="Date">${appt.date}</td>
@@ -199,112 +272,191 @@ async function loadAppointments() {
             `;
         });
 
-        const htmlRows = await Promise.all(htmlPromises);
+        // 6. Wait for all the user fetches and HTML creation to complete
+        const htmlRows = await Promise.all(appointmentPromises);
+
+        // 7. Join all the HTML rows and set the table body
         tableBody.innerHTML = htmlRows.join('');
 
     } catch (error) {
         console.error("Error loading appointments: ", error);
-        tableBody.innerHTML = '<tr><td colspan="3">Error loading data. Check console.</td></tr>';
+
+        // Check if the error is a "missing index" error
+        if (error.code === 'failed-precondition') {
+            tableBody.innerHTML = `<tr><td colspan="3"><strong>Error:</strong> This query needs a database index. Check the console (press F12) for a link to create it.</td></tr>`;
+            console.warn("You must create a Firestore index. Firebase should have logged a link below this message. Click it to create the index automatically.");
+        } else {
+            tableBody.innerHTML = '<tr><td colspan="3">Error loading appointments.</td></tr>';
+        }
     }
 }
+// --- END UPDATED FUNCTION ---
 
-// --- FUNCTION 2: LOAD PENDING REQUESTS (TABLE) ---
+let pendingSortMode = 'oldest'; // 'oldest' | 'newest'
+
+// --- Pending consultation requests (Admin confirmation) ---
+// Supports BOTH layouts:
+//  - Old table layout:   <tbody id="pending-table-body">...</tbody>
+//  - New card layout:    <div class="pending-list">...</div>
 async function loadPendingRequests() {
     const tableBody = document.getElementById('pending-table-body');
-    if (!tableBody) return; 
+    const pendingList = document.querySelector('.pending-list');
 
-    tableBody.innerHTML = '<tr><td colspan="4">Loading pending requests...</td></tr>';
+    // Decide which container to use based on the current HTML
+    const useTable = !!tableBody;
+    const container = tableBody || pendingList;
+    if (!container) return; // Not on a pending-requests page
+
+    // Initial loading state
+    if (useTable) {
+        container.innerHTML = '<tr><td colspan="4">Loading pending requests...</td></tr>';
+    } else {
+        container.innerHTML = '<p>Loading...</p>';
+    }
 
     try {
-        console.log("Fetching consultationRequests...");
         const reqCol = collection(db, 'consultationRequests');
         const snapshot = await getDocs(reqCol);
+        console.log('All consultation requests found:', snapshot.size);
         
-        // 1. Filter docs
+        // Filter for pending/unconfirmed requests (status == 'pending' OR status field missing)
         const pendingDocs = snapshot.docs.filter(doc => {
-            const data = doc.data();
-            return data.status === 'pending' || data.status === undefined;
+            const status = doc.data().status;
+            return status === 'pending' || status === undefined;
         });
-
-        console.log(`Found ${pendingDocs.length} pending requests.`);
+        console.log('Pending requests after filter:', pendingDocs.length);
 
         if (!pendingDocs.length) {
-            tableBody.innerHTML = '<tr><td colspan="4">No pending consultation requests.</td></tr>';
+            if (useTable) {
+                container.innerHTML = '<tr><td colspan="4">No pending consultation requests.</td></tr>';
+            } else {
+                container.innerHTML = '<p>No pending consultation requests.</p>';
+            }
             return;
         }
-
-        // 2. Map to objects with sortDate
-        const pendingRequests = pendingDocs.map(doc => {
-            const data = doc.data();
+        
+        // Attach sortDate and sort according to current mode
+        const pendingItems = pendingDocs.map(docSnap => {
+            const data = docSnap.data();
+            // Prefer createdAt timestamp if available, otherwise fall back to date/time fields
+            let sortDate;
+            if (data.createdAt && typeof data.createdAt.toMillis === 'function') {
+                sortDate = new Date(data.createdAt.toMillis());
+            } else {
+                const dateStr = data.date || data.requestDate;
+                const timeStr = data.time || data.requestTime;
+                sortDate = parseDateTime(dateStr, timeStr);
+            }
             return {
-                id: doc.id,
-                ...data,
-                sortDate: parseDateTime(data.date, data.time) 
+                id: docSnap.id,
+                data,
+                sortDate
             };
         });
 
-        // 3. Sort Ascending (Oldest First)
-        pendingRequests.sort((a, b) => a.sortDate - b.sortDate);
+        if (pendingSortMode === 'newest') {
+            pendingItems.sort((a, b) => b.sortDate - a.sortDate);
+        } else {
+            pendingItems.sort((a, b) => a.sortDate - b.sortDate);
+        }
 
-        // 4. Generate HTML
-        const rows = await Promise.all(pendingRequests.map(async (req) => {
+        const rows = await Promise.all(pendingItems.map(async (item) => {
+            const req = item.data;
             const patientId = req.userId || req.userUID || null;
             let patientName = req.name || 'Unknown Patient';
 
             if (patientId) {
                 try {
-                    const uSnap = await getDoc(doc(db, 'users', patientId));
-                    if (uSnap.exists()) patientName = uSnap.data().name || patientName;
-                } catch (e) { console.error(e); }
+                    const uRef = doc(db, 'users', patientId);
+                    const uSnap = await getDoc(uRef);
+                    if (uSnap.exists()) {
+                        patientName = uSnap.data().name || patientName;
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch patient name for pending request', e);
+                }
             }
 
-            const date = req.date || '--/--/----';
-            const time = req.time || '--:--';
+            const date = req.date || req.requestDate || '--/--/----';
+            const time = req.time || req.requestTime || '--:--';
 
-            return `
-                <tr class="pending-item" data-request-id="${req.id}">
-                    <td data-label="Date">${date}</td>
-                    <td data-label="Time">${time}</td>
-                    <td data-label="Patient">
-                        <strong>${patientName}</strong>
-                    </td>
-                    <td data-label="Actions">
-                        <button class="btn confirm-request" type="button" style="width: auto; padding: 5px 10px; margin-right: 5px;">Confirm</button>
-                        <button class="btn decline-request" type="button" style="background:#e74c3c; width: auto; padding: 5px 10px;">Decline</button>
-                    </td>
-                </tr>
-            `;
+            // Render as table row or card depending on layout
+            if (useTable) {
+                return `
+                    <tr class="pending-item" data-request-id="${item.id}">
+                        <td data-label="Date">${date}</td>
+                        <td data-label="Time">${time}</td>
+                        <td data-label="Patient"><strong>${patientName}</strong></td>
+                        <td data-label="Actions">
+                            <button class="btn confirm-request" type="button" style="width:auto;padding:5px 10px;margin-right:5px;">Confirm</button>
+                            <button class="btn decline-request" type="button" style="background:#e74c3c;width:auto;padding:5px 10px;">Decline</button>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                return `
+                    <div class="pending-item" data-request-id="${item.id}">
+                        <div class="pending-meta"><strong>${patientName}</strong> — ${date} ${time}</div>
+                        <div class="pending-actions">
+                            <button class="btn confirm-request">Confirm</button>
+                            <button class="btn decline-request" style="background:#e74c3c;border:none">Decline</button>
+                        </div>
+                    </div>
+                `;
+            }
         }));
 
-        tableBody.innerHTML = rows.join('');
+        container.innerHTML = rows.join('');
 
-        // Attach Event Listeners
-        const confirmBtns = tableBody.querySelectorAll('.confirm-request');
-        confirmBtns.forEach(btn => {
-            btn.addEventListener('click', function(e) {
+        // Wire up confirm / decline buttons (works for both layouts)
+        container.querySelectorAll('.confirm-request').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
                 const item = e.target.closest('.pending-item');
-                const id = item.getAttribute('data-request-id');
-                confirmRequest(id);
+                const requestId = item.getAttribute('data-request-id');
+                await confirmRequest(requestId);
             });
         });
-
-        const declineBtns = tableBody.querySelectorAll('.decline-request');
-        declineBtns.forEach(btn => {
-            btn.addEventListener('click', function(e) {
+        
+        container.querySelectorAll('.decline-request').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
                 const item = e.target.closest('.pending-item');
                 const id = item.getAttribute('data-request-id');
-                declineRequest(id);
+                await declineRequest(id);
             });
         });
 
     } catch (error) {
-        console.error('Error loading pending:', error);
-        tableBody.innerHTML = '<tr><td colspan="4">Error loading requests. Check console.</td></tr>';
+        console.error('Error loading pending requests', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        
+        if (container) {
+            if (error.code === 'failed-precondition') {
+                if (useTable) {
+                    container.innerHTML = '<tr><td colspan="4">Database index required. Check F12 console for link.</td></tr>';
+                } else {
+                    container.innerHTML = '<p>Database index required. Check F12 console for link.</p>';
+                }
+            } else if (error.code === 'permission-denied') {
+                if (useTable) {
+                    container.innerHTML = '<tr><td colspan="4">Permission denied reading requests. Check Firestore rules.</td></tr>';
+                } else {
+                    container.innerHTML = '<p>Permission denied reading requests. Check Firestore rules.</p>';
+                }
+            } else {
+                if (useTable) {
+                    container.innerHTML = '<tr><td colspan="4">Error loading pending requests.</td></tr>';
+                } else {
+                    container.innerHTML = '<p>Error loading pending requests.</p>';
+                }
+            }
+        }
     }
 }
 
 async function confirmRequest(requestId) {
-    if (!confirm('Confirm this consultation?')) return;
+    if (!confirm('Confirm this consultation and add to calendar?')) return;
+    
     try {
         const reqRef = doc(db, 'consultationRequests', requestId);
         const reqSnap = await getDoc(reqRef);
@@ -312,71 +464,178 @@ async function confirmRequest(requestId) {
 
         const req = reqSnap.data();
 
-        // Add to bookedSlots
+        // Add to bookedSlots with explicit strings
         await addDoc(collection(db, 'bookedSlots'), {
-            date: req.date, 
-            time: req.time, 
+            date: req.date, // "28/11/2025"
+            time: req.time, // "4:00-6:00"
             userId: req.userId || req.userUID || null,
             status: 'confirmed',
             createdAt: serverTimestamp(),
-            createdBy: auth.currentUser ? auth.currentUser.uid : 'admin'
+            createdBy: auth.currentUser ? auth.currentUser.uid : null
         });
 
-        // Update request status
         await updateDoc(reqRef, {
             status: 'confirmed',
-            confirmedAt: serverTimestamp()
+            confirmedAt: serverTimestamp(),
+            confirmedBy: auth.currentUser ? auth.currentUser.uid : null
         });
 
-        loadPendingRequests(); 
-        alert('Confirmed and added to calendar.');
+        loadPendingRequests(); // Reload list
+
+        alert('Consultation confirmed and added to calendar.');
     } catch (error) {
-        console.error(error);
-        alert('Failed to confirm. See console.');
+        console.error('Error confirming request', error);
+        alert('Failed to confirm request. See console for details.');
     }
 }
 
 async function declineRequest(requestId) {
-    const reason = prompt('Reason for declining (optional):');
+    const reason = prompt('Optional: enter a reason for declining (or leave empty):');
     try {
         const reqRef = doc(db, 'consultationRequests', requestId);
         await updateDoc(reqRef, {
             status: 'declined',
             declinedAt: serverTimestamp(),
+            declinedBy: auth.currentUser ? auth.currentUser.uid : null,
             declineReason: reason || ''
         });
-        
+
         loadPendingRequests();
-        alert('Request declined.');
+        alert('Consultation request declined.');
     } catch (error) {
-        console.error(error);
-        alert('Failed to decline.');
+        console.error('Error declining request', error);
+        alert('Failed to decline request. See console for details.');
     }
 }
 
-// --- FUNCTION 3: CALENDAR ---
+// --- End pending-request functions ---
+
+// --- User Profiles (Admin view) ---
+let userProfilesSortMode = 'name'; // 'name' | 'latest'
+
+async function loadUserProfiles() {
+    const grid = document.getElementById('user-profiles-grid');
+    if (!grid) return;
+
+    grid.innerHTML = '<p>Loading user profiles...</p>';
+
+    try {
+        const usersCol = collection(db, 'users');
+        const snapshot = await getDocs(usersCol);
+
+        if (snapshot.empty) {
+            grid.innerHTML = '<p>No users found.</p>';
+            return;
+        }
+
+        let users = snapshot.docs.map(docSnap => {
+            const data = docSnap.data();
+            return {
+                id: docSnap.id,
+                ...data
+            };
+        });
+
+        // Sort: by name A–Z or latest (by createdAt or timestamp if available)
+        if (userProfilesSortMode === 'latest') {
+            users.sort((a, b) => {
+                const aTs = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+                const bTs = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+                return bTs - aTs;
+            });
+        } else {
+            users.sort((a, b) => {
+                const aName = (a.name || '').toLowerCase();
+                const bName = (b.name || '').toLowerCase();
+                return aName.localeCompare(bName);
+            });
+        }
+
+        const cards = await Promise.all(users.map(async (user) => {
+            const name = user.name || 'Unknown';
+            const age = user.age ? `${user.age} yrs Old` : '-- yrs Old';
+            const sex = user.sex || '--';
+            const email = user.email || 'No email';
+            const city = user.city || '--';
+            const barangay = user.barangay || '--';
+            const province = user.province || '--';
+            const region = user.region || '--';
+
+            // Build location string
+            const locationParts = [barangay, city, province, region].filter(p => p !== '--');
+            const location = locationParts.length > 0 ? locationParts.join(', ') : 'Unknown Location';
+
+            // Fetch the most recently created confirmed consultation for this user
+            let scheduledText = 'No confirmed consultations yet';
+            try {
+                const bookingsQ = query(
+                    collection(db, 'bookedSlots'),
+                    where('userId', '==', user.id),
+                    where('status', '==', 'confirmed'),
+                    orderBy('createdAt', 'desc'),
+                    limit(1)
+                );
+                const bookingSnap = await getDocs(bookingsQ);
+                if (!bookingSnap.empty) {
+                    const booking = bookingSnap.docs[0].data();
+                    const bDate = booking.date || '--/--/----';
+                    const bTime = booking.time || '--:--';
+                    scheduledText = `Last scheduled: ${bDate} at ${bTime}`;
+                }
+            } catch (e) {
+                console.error('Error loading latest booking for user', user.id, e);
+            }
+
+            return `
+                <article class="user-card">
+                    <header class="user-card-header">
+                        <h2>${name}</h2>
+                        <p class="user-card-meta">
+                            <span>${age}</span> • <span>${sex}</span>
+                        </p>
+                        <p class="user-card-location">${location}</p>
+                        <p class="user-card-email">${email}</p>
+                    </header>
+                    <div class="user-card-actions">
+                        <div class="user-card-name"><strong>${name}</strong></div>
+                        <div class="user-card-schedule">${scheduledText}</div>
+                    </div>
+                    <div class="user-card-button-wrapper">
+                        <a href="patient-profile.html?id=${encodeURIComponent(user.id)}" class="btn user-card-btn">
+                            View Profile &amp; Report
+                        </a>
+                    </div>
+                </article>
+            `;
+        }));
+
+        grid.innerHTML = cards.join('');
+    } catch (error) {
+        console.error('Error loading user profiles', error);
+        grid.innerHTML = '<p>Error loading user profiles. Check console for details.</p>';
+    }
+}
+
+// --- (LATEST) Calendar state & functions ---
 let currentViewDate = new Date();
+// --- **** TIME CHANGE #1: New 8am-6pm map **** ---
+// This maps our database time (08:00) to a grid row number (1)
 const timeToRow = {
     '08:00': 1, '09:00': 2, '10:00': 3, '11:00': 4, '12:00': 5,
     '13:00': 6, '14:00': 7, '15:00': 8, '16:00': 9, '17:00': 10
 };
+// --- **** TIME CHANGE #2: New 8am-5pm labels (for 10 slots) **** ---
 const timeSlots = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 
-function getSunday(date) {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day;
-    return new Date(d.setDate(diff));
-}
-
+// This function now *only* draws the background grid and labels
 function renderWeeklyCalendar(date) {
     const calendarTitle = document.getElementById('calendar-title');
     const calendarHeader = document.getElementById('calendar-header');
     const calendarBody = document.getElementById('calendar-body');
     if (!calendarTitle || !calendarHeader || !calendarBody) return;
 
-    calendarHeader.innerHTML = ''; 
-    calendarBody.innerHTML = '';   
+    calendarHeader.innerHTML = ''; // Clear header
+    calendarBody.innerHTML = '';   // Clear body
 
     const sunday = getSunday(date);
     const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long' });
@@ -384,8 +643,9 @@ function renderWeeklyCalendar(date) {
 
     calendarTitle.textContent = `${monthFormatter.format(sunday).toUpperCase()} ${sunday.getFullYear()}`;
 
+    // 1. Build Header
     calendarHeader.innerHTML = '<div class="time-column">Time</div>';
-    for (let i = 0; i < 7; i++) { 
+    for (let i = 0; i < 7; i++) { // SUN - SAT
         const currentDay = new Date(sunday);
         currentDay.setDate(sunday.getDate() + i);
         const dayName = dayFormatter.format(currentDay).toUpperCase();
@@ -393,52 +653,36 @@ function renderWeeklyCalendar(date) {
         calendarHeader.innerHTML += `<div class="day-header">${dayName} ${dayNum}</div>`;
     }
 
+    // 2. Build Body (Time labels and background columns)
+    // Add time labels
     for (let i = 0; i < timeSlots.length; i++) {
+        const time = timeSlots[i];
         const label = document.createElement('div');
         label.className = 'time-label';
-        const [h] = timeSlots[i].split(':');
-        const hInt = parseInt(h);
-        const ampm = hInt >= 12 ? 'PM' : 'AM';
-        const disp = hInt > 12 ? hInt - 12 : hInt;
-        label.textContent = `${disp} ${ampm}`;
-        label.style.gridRow = i + 1;
+        label.textContent = formatTimeLabel(time);
+        label.style.gridRow = i + 1; // Place it in the correct row
         label.style.gridColumn = 1;  
         calendarBody.appendChild(label);
     }
-    for (let i = 0; i < 7; i++) { 
+    
+    // Add 7 day columns
+    for (let i = 0; i < 7; i++) { // 7 day columns
         const dayCol = document.createElement('div');
         dayCol.className = 'day-bg-col';
-        dayCol.style.gridColumn = i + 2; 
+        dayCol.style.gridColumn = i + 2; // Start from 2nd grid column
         calendarBody.appendChild(dayCol);
     }
 }
 
-function normalizeStartTime(timeStr) {
-    const isPM = timeStr.toLowerCase().includes('pm');
-    const isAM = timeStr.toLowerCase().includes('am');
-
-    // Clean AM/PM from the string to parse numbers
-    const cleanTimeStr = timeStr.replace(/am|pm/gi, '').trim();
-
-    const parts = cleanTimeStr.split(':');
-    if (parts.length !== 2) return null;
-    let hour = parseInt(parts[0], 10);
-    let minute = parts[1].trim(); // trim potential spaces
-
-    if (isNaN(hour)) return null;
-
-    if (isPM && hour < 12) hour += 12;
-    if (isAM && hour === 12) hour = 0;
-
-    return `${String(hour).padStart(2, '0')}:${minute}`;
-}
-
+// --- **** LATEST CALENDAR FUNCTION (WITH NAME FETCHING AND DD/MM/YYYY FIX) **** ---
 async function initializeCalendar() {
     const calendarBody = document.getElementById('calendar-body');
     if (!calendarBody) return;
 
+    // 1. Render the background grid first
     renderWeeklyCalendar(currentViewDate);
 
+    // Calculate Week Boundaries (Start of Sunday to End of Saturday)
     const weekStart = getSunday(currentViewDate);
     weekStart.setHours(0, 0, 0, 0);
     const weekEnd = new Date(weekStart);
@@ -446,73 +690,274 @@ async function initializeCalendar() {
     weekEnd.setHours(23, 59, 59, 999);
 
     try {
-        const q = query(collectionGroup(db, "bookedSlots"), where('status', '==', 'confirmed'));
+        // 2. Fetch all appointments
+        // Only show bookings that have been confirmed by an admin
+        const q = query(collectionGroup(db, "bookedSlots"), where('status', '==', 'confirmed'), orderBy("time"));
         const querySnapshot = await getDocs(q);
 
+        if (querySnapshot.empty) {
+            console.log("No appointments found for calendar.");
+        }
+
+        // 3. Loop through docs and place them on the grid
         querySnapshot.forEach(async (apptDoc) => {
             const appt = apptDoc.data();
-            const patientId = appt.userId;
+            const patientId = appt.userId; // Get the ID
 
+            // --- FIXED: Format Date (DD/MM/YYYY -> Date object) ---
             if (!appt.date || typeof appt.date !== 'string') return;
             const dParts = appt.date.split('/'); 
-            if (dParts.length !== 3) return;
-            
+            if (dParts.length !== 3) {
+                console.warn("Skipping appointment with malformed date:", appt.date);
+                return;
+            }
+            // Manual construction: new Date(Year, MonthIndex, Day)
             const apptDate = new Date(
                 parseInt(dParts[2], 10),     // Year
-                parseInt(dParts[1], 10) - 1, // Month
+                parseInt(dParts[1], 10) - 1, // Month (0-indexed)
                 parseInt(dParts[0], 10)      // Day
             );
 
-            if (apptDate < weekStart || apptDate > weekEnd) return;
+            // B. Check if this appointment is in the currently displayed week
+            if (apptDate < weekStart || apptDate > weekEnd) {
+                return; // Skip this appointment, it's not for this week
+            }
             
-            const apptDay = apptDate.getDay(); 
-            const colStart = apptDay + 2;      
+            // C. Get Day of Week (0=Sun, 1=Mon...).
+            const apptDay = apptDate.getDay();
+            const colStart = apptDay + 2; // Sun=2, Mon=3...
 
-            const tParts = appt.time.split('-');
-            if (tParts.length !== 2) return;
+            // D. Get Time Info
+            const timeParts = appt.time.split('-');
+            if (timeParts.length !== 2) return;
             
-            const startTime = normalizeStartTime(tParts[0].trim()); 
-            const endRaw = tParts[1].trim().split(':')[0] + ':00';  
-            const endTime = normalizeStartTime(endRaw);             
+            const rawStartTime = timeParts[0].trim(); // e.g. "4:00"
+            const endTimePart = timeParts[1].trim(); // e.g. "6:00"
+            
+            // Use helper to convert "4:00" to "16:00"
+            const startTime = normalizeStartTime(rawStartTime);
+            // Use helper to convert "6:00" to "18:00"
+            const endTime = normalizeStartTime(endTimePart.split(':')[0] + ':00');
 
             const rowStart = timeToRow[startTime];
-            const rowEnd = timeToRow[endTime] ? timeToRow[endTime] : (rowStart + 1);
+            const rowEnd = timeToRow[endTime] ? timeToRow[endTime] : (timeToRow[startTime] ? timeToRow[startTime] + 1 : null); 
             
-            if (!rowStart) return;
-
-            let patientName = "Unknown";
-            if (patientId) {
-                try {
-                    const uSnap = await getDoc(doc(db, 'users', patientId));
-                    if (uSnap.exists()) patientName = uSnap.data().name || "Unknown";
-                } catch (e) {}
+            if (!rowStart) {
+                console.warn("Skipping appointment. Could not find row for start time:", startTime, "(Original:", rawStartTime, ")");
+                return;
             }
 
-            const el = document.createElement('div');
-            el.className = 'appointment';
-            el.style.setProperty('--col-start', colStart);
-            el.style.setProperty('--row-start', rowStart);
-            el.style.setProperty('--row-end', rowEnd);
+            // --- **** NEW: Fetch Patient Name **** ---
+            let patientName = "Unknown Patient";
+            if (patientId) {
+                try {
+                    const userDocRef = doc(db, 'users', patientId);
+                    const userDocSnap = await getDoc(userDocRef);
+                    if (userDocSnap.exists()) {
+                        patientName = userDocSnap.data().name || "Unknown Patient";
+                    }
+                } catch (e) {
+                    console.error("Error fetching name for calendar", e);
+                }
+            }
+            // --- **** END: Fetch Patient Name **** ---
+
+            // E. Create the appointment element
+            const apptElement = document.createElement('div');
+            apptElement.className = 'appointment';
             
-            el.innerHTML = `
+            // Set grid position via CSS variables
+            apptElement.style.setProperty('--col-start', colStart);
+            apptElement.style.setProperty('--row-start', rowStart);
+            apptElement.style.setProperty('--row-end', rowEnd);
+            
+            // Create the inner link (use the new patientName)
+            apptElement.innerHTML = `
                 <a href="patient-profile.html?id=${encodeURIComponent(patientId)}" class="patient-appointment">
                     ${patientName}
                     <span class="appt-time">${appt.time}</span>
                 </a>
             `;
-            calendarBody.appendChild(el);
+            
+            // F. Add to calendar body
+            calendarBody.appendChild(apptElement);
         });
+
     } catch (error) {
-        console.error("Calendar Error: ", error);
+        console.error("Error initializing calendar: ", error);
     }
 }
+// --- END LATEST CALENDAR FUNCTION ---
+
+function formatTimeLabel(time) {
+    const [hour] = time.split(':');
+    const h = parseInt(hour, 10);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const displayHour = h % 12 === 0 ? 12 : h % 12;
+    return `${displayHour} ${ampm}`;
+}
+
+// --- CHANGE #8: This function now gets SUNDAY ---
+function getSunday(date) {
+    const d = new Date(date);
+    const day = d.getDay(); // 0 for Sunday, 1 for Monday, etc.
+    const diff = d.getDate() - day; // Subtract the day number to get to Sunday
+    return new Date(d.setDate(diff));
+}
+
+// --- NEW HELPER: Normalizes time from DB to match timeToRow map ---
+function normalizeStartTime(timeStr) {
+    // Accepts "4:00", "08:00", "4:00 PM", etc.
+    const isPM = timeStr.toLowerCase().includes('pm');
+    const isAM = timeStr.toLowerCase().includes('am');
+
+    // Strip AM/PM before parsing
+    const cleanTimeStr = timeStr.replace(/am|pm/gi, '').trim();
+    const parts = cleanTimeStr.split(':');
+    if (parts.length !== 2) return null;
+
+    let hour = parseInt(parts[0], 10);
+    let minute = parts[1].trim();
+    
+    if (isNaN(hour)) return null;
+
+    // Standard 12h -> 24h conversion
+    if (isPM && hour < 12) hour += 12;
+    if (isAM && hour === 12) hour = 0;
+
+    return `${String(hour).padStart(2, '0')}:${minute}`;
+}
+// --- END NEW HELPER ---
+
+// --- END (LATEST) Calendar functions ---
 
 
-// --- FUNCTION 4: PATIENT PROFILE ---
+// This array is no longer used by the new calendar
+let allAppointments = [];
+
+// UI selectors (Define these once if needed globally)
+const wrapper = document.querySelector('.wrapper');
+const loginlink = document.querySelector('.login-link');
+// const regsiterlink = document.querySelector('.register-link'); // No longer needed
+const iconClose = document.querySelector('.icon-close');
+const body = document.querySelector('body');
+const nav = document.getElementById('primary-navigation'); // Might be null
+const navToggle = document.querySelector('.nav-toggle'); // Might be null
+const scrim = document.querySelector('.scrim'); // Might be null
+
+// Toggle login/register view
+// if (regsiterlink && wrapper) regsiterlink.addEventListener('click', ()=> wrapper.classList.add('active')); // No longer needed
+if (loginlink && wrapper) loginlink.addEventListener('click', ()=> wrapper.classList.remove('active'));
+
+// Close modal
+if (iconClose) iconClose.addEventListener('click', closeOverlays);
+
+// Mobile nav toggle (check elements)
+if (navToggle && nav) {
+    navToggle.addEventListener('click', ()=> {
+        const open = nav.classList.toggle('open');
+        navToggle.setAttribute('aria-expanded', String(open));
+        showScrim(open);
+    });
+}
+
+// Scrim click closes overlays
+if (scrim) scrim.addEventListener('click', closeOverlays);
+
+// ESC closes overlays
+document.addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape') closeOverlays();
+});
+
+// --- Helper Functions ---
+function closeOverlays(){
+    if (wrapper) wrapper.classList.remove('active-popup');
+    if (body) body.classList.remove('login-active');
+    if (nav) nav.classList.remove('open');
+    if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
+    
+    // Also close the new main nav
+    const mainNav = document.getElementById('primary-navigation');
+    const mainHamburger = document.getElementById('mobile-hamburger-main');
+    if (mainNav && mainNav.classList.contains('open')) {
+        mainNav.classList.remove('open');
+        if (mainHamburger) mainHamburger.setAttribute('aria-expanded', 'false');
+        document.body.classList.remove('nav-open');
+    }
+
+    showScrim(false);
+}
+
+function showScrim(show){
+    if (!scrim) return;
+    if (show) scrim.classList.add('visible'); else scrim.classList.remove('visible');
+}
+// --- End Helper Functions ---
+
+
+// --- Login logic with persistence (MODIFIED) ---
+const loginForm = document.querySelector('.form-box.login form');
+if (loginForm) {
+    loginForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const rememberMeInput = document.querySelector('.form-box.login input[name="remember"]');
+        const rememberMe = rememberMeInput ? rememberMeInput.checked : false;
+
+        // --- NEW: Admin-only check ---
+        if (email !== 'atchazoj6@gmail.com') {
+            alert('This email address is not authorized for login.');
+            return; // Stop the login process
+        }
+        // --- END: Admin-only check ---
+
+        console.log("Remember Me:", rememberMe);
+        const persistenceType = rememberMe ? browserLocalPersistence : browserSessionPersistence;
+        console.log("Setting persistence to:", persistenceType === browserLocalPersistence ? "Local" : "Session");
+
+        setPersistence(auth, persistenceType)
+            .then(() => {
+                console.log("Persistence set.");
+                return signInWithEmailAndPassword(auth, email, password);
+            })
+            .then((userCredential) => {
+                console.log("Login successful.");
+                closeOverlays();
+                // --- FIX: Redirect to confirmed consultations ---
+                window.location.href = 'confirmed-consultations.html';
+            })
+            .catch((error) => {
+                console.error("Login error:", error);
+                const errorCode = error.code;
+                if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
+                    alert('Invalid email or password. Please try again.');
+                } else {
+                    alert(error.message);
+                }
+            });
+    });
+}
+
+// --- Registration logic (REMOVED) ---
+// const registerForm = document.querySelector('.form-box.register form');
+// ... all registration logic removed ...
+
+// --- Sidebar hidden nav toggle ---
+const sidebarHamburger = document.querySelector('.sidebar-header .hamburger-menu');
+const hiddenNavItems = document.querySelectorAll('.nav-item.hidden');
+if (sidebarHamburger && hiddenNavItems.length > 0) {
+    sidebarHamburger.addEventListener('click', function() {
+        hiddenNavItems.forEach(item => item.classList.toggle('show'));
+    });
+}
+
+// --- **** (THIS IS THE UPDATED FUNCTION with PERCENTAGE CALC & NEW Q&A) **** ---
 async function loadPatientProfile() {
     const urlParams = new URLSearchParams(window.location.search);
     const patientId = urlParams.get('id');
 
+    // --- Get all page elements ---
     const nameElement = document.getElementById('patient-name');
     const ageElement = document.getElementById('patient-age');
     const locationElement = document.getElementById('patient-location');
@@ -521,262 +966,380 @@ async function loadPatientProfile() {
     const descriptionElement = document.querySelector('.severity-description p');
     const needle = document.getElementById('gauge-needle');
 
+    // --- Get all NEW modal elements ---
     const modalPatientName = document.getElementById('modal-patient-name');
     const modalPatientAge = document.getElementById('modal-patient-age');
+    const modalPatientSex = document.getElementById('modal-patient-sex');
     const modalPatientLocation = document.getElementById('modal-patient-location');
     const modalPatientEmail = document.getElementById('modal-patient-email');
     const modalSeverityText = document.getElementById('modal-severity-text');
     const modalSeverityPercent = document.getElementById('modal-severity-percent');
     const modalRecommendation = document.getElementById('modal-recommendation');
     const qaContainer = document.getElementById('modal-qa-container');
+    // --- End modal elements ---
 
-    if (!patientId) return;
+    if (!patientId) {
+        if (nameElement) nameElement.textContent = "No Patient ID Provided";
+        return;
+    }
 
     try {
-        const userSnap = await getDoc(doc(db, "users", patientId));
-        if (userSnap.exists()) {
-            const u = userSnap.data();
-            if (nameElement) nameElement.textContent = u.name || "Unknown";
-            if (ageElement) ageElement.textContent = u.age ? `${u.age} yrs Old` : '-- yrs Old';
-            if (locationElement) locationElement.textContent = u.city || "Unknown Location";
+        // --- FETCH 1: Get User Info from 'users' collection ---
+        const userDocRef = doc(db, "users", patientId);
+        const userDocSnap = await getDoc(userDocRef);
 
-            if (modalPatientName) modalPatientName.textContent = u.name || "Unknown";
-            if (modalPatientAge) modalPatientAge.textContent = u.age || "--";
-            if (modalPatientLocation) modalPatientLocation.textContent = u.city || "Unknown";
-            if (modalPatientEmail) modalPatientEmail.textContent = u.email || "No email";
+        if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            
+            // Build full location string
+            const locationParts = [];
+            if (userData.barangay) locationParts.push(userData.barangay);
+            if (userData.city) locationParts.push(userData.city);
+            if (userData.province) locationParts.push(userData.province);
+            if (userData.region) locationParts.push(userData.region);
+            const fullLocation = locationParts.length > 0 ? locationParts.join(', ') : (userData.city || "Unknown Location");
+            
+            // Populate main page
+            const sexElement = document.getElementById('patient-sex');
+            if (nameElement) nameElement.textContent = userData.name || "Unknown Patient";
+            if (ageElement) ageElement.textContent = userData.age ? `${userData.age} yrs Old` : '-- yrs Old';
+            if (sexElement) sexElement.textContent = userData.sex || '--';
+            if (locationElement) locationElement.textContent = fullLocation;
+
+            // --- Populate modal with user data ---
+            if (modalPatientName) modalPatientName.textContent = userData.name || "Unknown Patient";
+            if (modalPatientAge) modalPatientAge.textContent = userData.age || "--";
+            if (modalPatientSex) modalPatientSex.textContent = userData.sex || "--";
+            if (modalPatientLocation) modalPatientLocation.textContent = fullLocation;
+            if (modalPatientEmail) modalPatientEmail.textContent = userData.email || "No email provided";
+            
+        } else {
+            console.log("Patient document not found in 'users' collection");
+            if (nameElement) nameElement.textContent = "Patient Not Found";
         }
 
-        const predQ = query(
-            collectionGroup(db, "api_predictions"),
-            where("userId", "==", patientId),
-            orderBy("timestamp", "desc"),
-            limit(1)
+        // --- FETCH 2: Get Latest Prediction from 'api_predictions' ---
+        const predictionsRef = collectionGroup(db, "api_predictions");
+        const q = query(
+            predictionsRef,
+            where("userId", "==", patientId),    // Find reports for this user
+            orderBy("timestamp", "desc"), // Get the most recent one
+            limit(1)                      // Only get one
         );
-        const predSnap = await getDocs(predQ);
 
-        if (!predSnap.empty) {
-            const pred = predSnap.docs[0].data();
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            const predictionData = querySnapshot.docs[0].data();
             
-            let rawScore = parseFloat(pred.severity_numeric);
+            // --- UPDATED Logic for severity and gauge ---
+            // 1. Get raw numeric score (e.g., 1.6, 2.8)
+            let rawScore = parseFloat(predictionData.severity_numeric);
             if (isNaN(rawScore)) rawScore = 1.0;
-            let pct = ((rawScore - 1.0) / 2.0) * 100;
-            pct = Math.max(0, Math.min(100, pct));
-            const dispPct = Math.round(pct);
+
+            // 2. Convert Scale: (1.0 - 3.0) to (0% - 100%)
+            // Formula: ((Score - 1.0) / 2.0) * 100
+            let calculatedPercent = ((rawScore - 1.0) / 2.0) * 100;
+
+            // 3. Clamp to ensure 0-100 range
+            calculatedPercent = Math.max(0, Math.min(100, calculatedPercent));
+
+            const displayPercent = Math.round(calculatedPercent);
+            const severityText = predictionData.severity || 'unknown';
             
-            if (severityElement) severityElement.textContent = dispPct + '%';
-            if (severityTextElement) severityTextElement.textContent = pred.severity || 'unknown';
+            // --- Populate main page ---
+            if (severityElement) severityElement.textContent = displayPercent + '%';
+            if (severityTextElement) severityTextElement.textContent = severityText;
             if (descriptionElement) {
-                descriptionElement.innerHTML = `Based on SafeMind's analysis, the level of severity is <strong>${dispPct}%</strong> (${pred.severity}).`;
+                descriptionElement.innerHTML = `Based on SafeMind's analysis, the level of severity of the patient's depression is <strong>${displayPercent}%</strong> (${severityText}), which indicates a <strong>${severityText}</strong> level of depression.`;
             }
             if (needle) {
-                const angle = ((dispPct / 100) * 180) - 90;
+                // -90deg is 0%, 90deg is 100%
+                let angle = ((displayPercent / 100) * 180) - 90;
                 needle.style.transform = `rotate(${angle}deg)`;
             }
 
-            if (modalSeverityText) modalSeverityText.textContent = pred.severity;
-            if (modalSeverityPercent) modalSeverityPercent.textContent = dispPct + '%';
-            if (modalRecommendation) modalRecommendation.textContent = pred.recommendation || "None.";
+            // --- Populate modal with analysis data ---
+            if (modalSeverityText) modalSeverityText.textContent = severityText;
+            if (modalSeverityPercent) modalSeverityPercent.textContent = displayPercent + '%';
+            if (modalRecommendation) modalRecommendation.textContent = predictionData.recommendation || "No recommendation provided.";
 
+            
+            // --- **** NEW ROBUST Q&A LOGIC (Universal Adapter) **** ---
             if (qaContainer) {
-                qaContainer.innerHTML = '';
-                let ratings = [], texts = [];
-                const input = pred.input_data || {};
+                qaContainer.innerHTML = ''; // Clear old data
 
-                if (pred.ratings && Array.isArray(pred.ratings)) {
-                    ratings = pred.ratings; texts = pred.texts || [];
-                } else if (input.answers && Array.isArray(input.answers)) {
-                    ratings = input.answers; texts = input.texts || [];
-                } else {
+                let finalRatings = [];
+                let finalTexts = [];
+                const inputData = predictionData.input_data || {};
+
+                // SOURCE A: Top-Level Arrays (New AI Backend)
+                if (predictionData.ratings && Array.isArray(predictionData.ratings)) {
+                    finalRatings = predictionData.ratings;
+                    finalTexts = predictionData.texts || [];
+                }
+                // SOURCE B: Mobile App Input (Nested 'answers' array)
+                else if (inputData.answers && Array.isArray(inputData.answers)) {
+                    finalRatings = inputData.answers;
+                    finalTexts = inputData.texts || [];
+                }
+                // SOURCE C: Web App Input (Key-Value pairs 'rating_1', etc.)
+                else {
                     for (let i = 1; i <= 10; i++) {
-                        if (input[`rating_${i}`]) {
-                            ratings.push(input[`rating_${i}`]);
-                            texts.push(input[`text_${i}`] || "");
+                        if (inputData[`rating_${i}`]) {
+                            finalRatings.push(inputData[`rating_${i}`]);
+                            finalTexts.push(inputData[`text_${i}`] || "");
                         }
                     }
                 }
 
-                if (ratings.length > 0) {
-                    ratings.forEach((r, idx) => {
-                        const qNum = idx + 1;
-                        const qLabel = QUESTION_MAP[`rating_${qNum}`] || `Question ${qNum}`;
+                // 2. Render the Data
+                if (finalRatings.length > 0) {
+                    finalRatings.forEach((rating, index) => {
+                        // Map index (0-9) to Question Key (rating_1..10)
+                        const qNum = index + 1;
+                        const questionKey = `rating_${qNum}`;
+                        const questionLabel = QUESTION_MAP[questionKey] || `Question ${qNum}`;
                         
-                        const li = document.createElement('li');
-                        li.className = 'qa-item';
-                        li.innerHTML = `<strong>Q${qNum}: ${qLabel}</strong><p class="rating-answer">Rating: ${r}/5</p>`;
-                        qaContainer.appendChild(li);
+                        // Create List Item
+                        const item = document.createElement('li');
+                        item.className = 'qa-item';
+                        item.innerHTML = `
+                            <strong>Q${qNum}: ${questionLabel}</strong>
+                            <p class="rating-answer">Rating: <span class="highlight">${rating} / 5</span></p>
+                        `;
+                        qaContainer.appendChild(item);
 
-                        if (texts[idx]) {
-                            const ctxDiv = document.createElement('div');
-                            ctxDiv.style.cssText = "margin:5px 0 15px 15px; border-left:3px solid #eee; padding-left:15px; color:#555;";
-                            ctxDiv.innerHTML = `<small><em>${QUESTION_MAP[`text_${qNum}`]||"Context"}</em></small><br>"${texts[idx]}"`;
-                            qaContainer.appendChild(ctxDiv);
+                        // Append Text Context if it exists
+                        if (finalTexts[index] && finalTexts[index].trim() !== "") {
+                            const textItem = document.createElement('div');
+                            textItem.className = 'qa-text-context';
+                            textItem.style.marginTop = "5px";
+                            textItem.style.marginBottom = "15px";
+                            textItem.style.paddingLeft = "15px";
+                            textItem.style.borderLeft = "3px solid #eee";
+                            textItem.style.color = "#555";
+                            
+                            const textKey = `text_${qNum}`;
+                            const textLabel = QUESTION_MAP[textKey] || "Context";
+                            
+                            textItem.innerHTML = `
+                                <small><em>${textLabel}</em></small><br>
+                                "${finalTexts[index]}"
+                            `;
+                            qaContainer.appendChild(textItem);
                         }
                     });
                 } else {
-                    qaContainer.innerHTML = '<li>No Q&A data.</li>';
+                    qaContainer.innerHTML = '<li>No Q&A data found for this report.</li>';
                 }
             }
+            // --- **** END OF NEW ROBUST LOGIC **** ---
+
+
+        } else {
+            // This runs if the user exists but has no analysis reports
+            console.log("No prediction found for this user.");
+            if (severityElement) severityElement.textContent = '--%';
+            if (severityTextElement) severityTextElement.textContent = 'No analysis';
         }
+
     } catch (error) {
-        console.error("Profile Error:", error);
+        console.error("Error fetching patient data: ", error);
+        if (error.code === 'failed-precondition') {
+            console.warn("QUERY FAILED: This query requires a composite index. Check the console for a link to create it.");
+            if (nameElement) nameElement.textContent = "Database Index Error";
+            if (descriptionElement) descriptionElement.innerHTML = "This page failed to load due to a database configuration error. <strong>Check the F12 console for a link to create the required index.</strong>";
+        } else {
+            if (nameElement) nameElement.textContent = "Error loading profile.";
+        }
     }
 }
+// --- END UPDATED FUNCTION ---
 
 
-// --- DOM EVENTS ROUTER ---
+// --- Respect reduced motion ---
+const mediaReduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+if (mediaReduceMotion.matches) document.documentElement.classList.add('reduce-motion');
+
+
+// --- DOMContentLoaded listener ---
 document.addEventListener('DOMContentLoaded', function() {
     
-    // 1. Page Specific Loading
-    if (document.getElementById('schedule-table-body')) {
-        loadAppointments(); // Confirmed Page
-    }
-    // Changed this to check for the new table body ID
-    if (document.getElementById('pending-table-body')) {
-        loadPendingRequests(); // Pending Page
-    }
+    // --- UPDATED: Page specific initializations ---
+    // 1. Calendar
     if (document.getElementById('calendar-body')) {
-        initializeCalendar(); // Calendar Page
+        initializeCalendar();
     }
+    // 2. Patient Profile
     if (document.querySelector('.patient-profile-content')) {
-        loadPatientProfile(); // Profile Page
+        loadPatientProfile();
     }
+    // 3. Confirmed Consultations Table (New)
+    if (document.getElementById('schedule-table-body')) {
+        loadAppointments(); 
+    }
+    // 4. Pending Requests (supports both table + card layouts)
+    const hasPendingTable = document.getElementById('pending-table-body');
+    const hasPendingList = document.querySelector('.pending-list');
+    if (hasPendingTable || hasPendingList) {
+        loadPendingRequests();
+    }
+    // 5. User Profiles grid
+    if (document.getElementById('user-profiles-grid')) {
+        loadUserProfiles();
+    }
+    // --- END UPDATED ---
 
-    // 2. Calendar Buttons
+    // --- UPDATED: Calendar navigation ---
     const prevWeekBtn = document.getElementById('prev-week');
     const nextWeekBtn = document.getElementById('next-week');
     if (prevWeekBtn) prevWeekBtn.addEventListener('click', () => {
         currentViewDate.setDate(currentViewDate.getDate() - 7);
-        initializeCalendar();
-    });
+        initializeCalendar(); // Re-fetches and re-renders all
+     });
     if (nextWeekBtn) nextWeekBtn.addEventListener('click', () => {
         currentViewDate.setDate(currentViewDate.getDate() + 7);
-        initializeCalendar();
-    });
+        initializeCalendar(); // Re-fetches and re-renders all
+     });
+    // --- END UPDATED ---
 
-    // 3. Mobile Navigation
+    // Mobile sidebar toggle (Dashboard)
     const mobileHamburger = document.getElementById('mobile-hamburger');
-    const sidebar = document.querySelector('.dashboard-sidebar');
-    if (mobileHamburger && sidebar) {
-        mobileHamburger.addEventListener('click', () => sidebar.classList.toggle('open'));
-    }
+    const dashboardSidebar = document.querySelector('.dashboard-sidebar');
+    if (mobileHamburger && dashboardSidebar) {
+        mobileHamburger.addEventListener('click', function() {
+            dashboardSidebar.classList.toggle('open');
+        });
+     }
 
+    // --- NEW: Mobile Nav Toggle (Main Site) ---
     const mainHamburger = document.getElementById('mobile-hamburger-main');
-    const mainNav = document.getElementById('primary-navigation');
+    const mainNav = document.getElementById('primary-navigation'); 
+
     if (mainHamburger && mainNav) {
         mainHamburger.addEventListener('click', () => {
             const isOpen = mainNav.classList.toggle('open');
             mainHamburger.setAttribute('aria-expanded', isOpen);
-            document.body.classList.toggle('nav-open');
+            // Also toggle body class to prevent scrolling
+            document.body.classList.toggle('nav-open'); 
         });
     }
+    // --- END NEW ---
 
-    // 4. Auth & UI
-    const loginForm = document.querySelector('.form-box.login form');
-    if (loginForm) {
-        loginForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            const remember = document.querySelector('.form-box.login input[name="remember"]')?.checked;
 
-            if (email !== 'atchazoj6@gmail.com') return alert('Unauthorized email.');
-
-            const persist = remember ? browserLocalPersistence : browserSessionPersistence;
-            setPersistence(auth, persist)
-                .then(() => signInWithEmailAndPassword(auth, email, password))
-                .then(() => {
-                    closeOverlays();
-                    window.location.href = 'confirmed-consultations.html';
-                })
-                .catch(err => alert(err.message));
-        });
-    }
-
-    const forgotLink = document.querySelector('.remember-forgot a');
-    if (forgotLink) {
-        forgotLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('login-email')?.value.trim();
-            if (!email) return alert('Enter email first.');
-            sendPasswordResetEmail(auth, email)
-                .then(() => alert('Reset email sent.'))
-                .catch(err => alert(err.message));
-        });
-    }
-
+    // Profile dropdown & logout
     const userAvatar = document.querySelector('.user-avatar');
-    const dropdown = document.querySelector('.profile-dropdown');
-    if (userAvatar && dropdown) {
+    const profileDropdown = document.querySelector('.profile-dropdown');
+    if (userAvatar && profileDropdown) {
         userAvatar.addEventListener('click', (e) => {
             e.stopPropagation();
-            dropdown.classList.toggle('show');
+            profileDropdown.classList.toggle('show');
         });
         document.addEventListener('click', (e) => {
-            if (!userAvatar.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('show');
+            if (!userAvatar.contains(e.target) && !profileDropdown.contains(e.target)) {
+                profileDropdown.classList.remove('show');
+            }
         });
     }
-
-    const logoutBtn = document.getElementById('logout-button');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', (e) => {
+    const logoutButton = document.getElementById('logout-button');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', (e) => {
             e.preventDefault();
-            signOut(auth).then(() => window.location.href = 'index.html');
+            signOut(auth).then(() => {
+                window.location.href = 'index.html';
+            }).catch((error) => console.error('Signout error', error));
         });
     }
 
-    const closeIcon = document.querySelector('.icon-close');
-    const scrim = document.querySelector('.scrim'); 
-    const loginLink = document.querySelector('.login-link');
-    const wrapper = document.querySelector('.wrapper');
+    // --- Forgot Password Logic ---
+    const forgotPasswordLink = document.querySelector('.remember-forgot a');
+    if (forgotPasswordLink) {
+        forgotPasswordLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            const emailInput = document.getElementById('login-email');
+            const email = emailInput ? emailInput.value.trim() : null;
 
-    if (closeIcon) closeIcon.addEventListener('click', closeOverlays);
-    if (scrim) scrim.addEventListener('click', closeOverlays);
-    if (loginLink && wrapper) loginLink.addEventListener('click', () => wrapper.classList.remove('active'));
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeOverlays(); });
+            if (!email) {
+                alert('Please enter your email address in the email field first, then click "Forgot Password?".');
+                return;
+            }
 
-    // Report Modal
-    const reportBtn = document.querySelector('.view-report-link');
-    const rModal = document.querySelector('.report-modal-wrapper');
-    const rScrim = document.querySelector('.report-scrim');
-    const rClose = document.querySelector('.report-modal-close');
+            sendPasswordResetEmail(auth, email)
+                .then(() => {
+                    alert('Password reset email sent! Please check your inbox (and spam folder).');
+                      closeOverlays();
+                })
+                .catch((error) => {
+                    const errorCode = error.code;
+                    console.error("Password Reset Error:", errorCode, error.message);
+                    if (errorCode === 'auth/user-not-found' || errorCode === 'auth/invalid-email') {
+                        alert('Could not send reset email. Please ensure the email address is correct and registered.');
+                    } else {
+                        alert(`Error sending reset email: ${error.message}`);
+                    }
+                });
+        });
+    }
 
-    if (reportBtn && rModal && rScrim && rClose) {
-        const closeReport = () => {
-            rModal.classList.remove('show');
-            rScrim.classList.remove('show');
-            document.body.style.overflow = '';
+    // --- Sort controls for tables ---
+    const confirmedSortSelect = document.getElementById('confirmed-sort');
+    if (confirmedSortSelect) {
+        confirmedSortMode = confirmedSortSelect.value || 'newest';
+        confirmedSortSelect.addEventListener('change', () => {
+            confirmedSortMode = confirmedSortSelect.value || 'newest';
+            loadAppointments();
+        });
+    }
+
+    const pendingSortSelect = document.getElementById('pending-sort');
+    if (pendingSortSelect) {
+        pendingSortMode = pendingSortSelect.value || 'oldest';
+        pendingSortSelect.addEventListener('change', () => {
+            pendingSortMode = pendingSortSelect.value || 'oldest';
+            loadPendingRequests();
+        });
+    }
+
+    const userProfilesSortSelect = document.getElementById('user-profiles-sort');
+    if (userProfilesSortSelect) {
+        userProfilesSortMode = userProfilesSortSelect.value || 'name';
+        userProfilesSortSelect.addEventListener('change', () => {
+            userProfilesSortMode = userProfilesSortSelect.value || 'name';
+            loadUserProfiles();
+        });
+    }
+
+    // --- **** NEW MODAL CLICK HANDLERS **** ---
+    const reportButton = document.querySelector('.view-report-link');
+    const modalWrapper = document.querySelector('.report-modal-wrapper');
+    const modalScrim = document.querySelector('.report-scrim');
+    const modalClose = document.querySelector('.report-modal-close');
+
+    if (reportButton && modalWrapper && modalScrim && modalClose) {
+        // Function to open the modal
+        const openModal = () => {
+            modalWrapper.classList.add('show');
+            modalScrim.classList.add('show');
+            document.body.style.overflow = 'hidden'; // Prevent background scroll
         };
-        reportBtn.addEventListener('click', (e) => {
+
+        // Function to close the modal
+        const closeModal = () => {
+            modalWrapper.classList.remove('show');
+            modalScrim.classList.remove('show');
+            document.body.style.overflow = ''; // Allow background scroll
+        };
+
+        // Add click events
+        reportButton.addEventListener('click', (e) => {
             e.preventDefault();
-            rModal.classList.add('show');
-            rScrim.classList.add('show');
-            document.body.style.overflow = 'hidden';
+            openModal();
         });
-        rClose.addEventListener('click', closeReport);
-        rScrim.addEventListener('click', closeReport);
+        
+        modalClose.addEventListener('click', closeModal);
+        modalScrim.addEventListener('click', closeModal);
     }
+    // --- **** END OF NEW MODAL HANDLERS **** ---
+
 }); // End of DOMContentLoaded
-
-// --- Helper Functions ---
-function closeOverlays(){
-    const wrapper = document.querySelector('.wrapper');
-    const body = document.querySelector('body');
-    const nav = document.getElementById('primary-navigation');
-    const scrim = document.querySelector('.scrim');
-    const navToggle = document.getElementById('mobile-hamburger-main');
-
-    if (wrapper) wrapper.classList.remove('active-popup');
-    if (body) body.classList.remove('login-active');
-    if (nav) {
-        nav.classList.remove('open');
-        document.body.classList.remove('nav-open');
-    }
-    if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
-    if (scrim) scrim.classList.remove('visible');
-}
-
-function showScrim(show){
-    const scrim = document.querySelector('.scrim'); 
-    if (!scrim) return;
-    if (show) scrim.classList.add('visible'); else scrim.classList.remove('visible');
-}
