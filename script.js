@@ -778,7 +778,7 @@ async function initializeCalendar() {
             // Create the inner link (use the new patientName)
             apptElement.innerHTML = `
                 <a href="patient-profile.html?id=${encodeURIComponent(patientId)}" class="patient-appointment">
-                    ${patientName}
+                    <strong>${patientName}</strong>
                     <span class="appt-time">${appt.time}</span>
                 </a>
             `;
@@ -1072,70 +1072,84 @@ async function loadPatientProfile() {
             // --- **** NEW ROBUST Q&A LOGIC (Universal Adapter) **** ---
             if (qaContainer) {
                 qaContainer.innerHTML = ''; // Clear old data
-
-                let finalRatings = [];
-                let finalTexts = [];
                 const inputData = predictionData.input_data || {};
 
-                // SOURCE A: Top-Level Arrays (New AI Backend)
-                if (predictionData.ratings && Array.isArray(predictionData.ratings)) {
-                    finalRatings = predictionData.ratings;
-                    finalTexts = predictionData.texts || [];
-                }
-                // SOURCE B: Mobile App Input (Nested 'answers' array)
-                else if (inputData.answers && Array.isArray(inputData.answers)) {
-                    finalRatings = inputData.answers;
-                    finalTexts = inputData.texts || [];
-                }
-                // SOURCE C: Web App Input (Key-Value pairs 'rating_1', etc.)
-                else {
-                    for (let i = 1; i <= 10; i++) {
-                        if (inputData[`rating_${i}`]) {
-                            finalRatings.push(inputData[`rating_${i}`]);
-                            finalTexts.push(inputData[`text_${i}`] || "");
+                let hasData = false;
+
+                // Iterate 1 to 10 to ensure we capture every question slot,
+                // regardless of whether the rating or text exists.
+                for (let i = 1; i <= 10; i++) {
+                    const qKey = `rating_${i}`;
+                    const tKey = `text_${i}`;
+
+                    // Attempt to find rating and text from various sources
+                    let rating = null;
+                    let text = null;
+
+                    // 1. Check direct keys (Web App / Legacy)
+                    if (inputData[qKey] !== undefined) rating = inputData[qKey];
+                    if (inputData[tKey] !== undefined) text = inputData[tKey];
+
+                    // 2. Check Arrays (New Backend / Mobile) if direct keys failed
+                    // Assuming arrays are 0-indexed, so index = i - 1
+                    const arrIndex = i - 1;
+
+                    if (rating === null && predictionData.ratings && Array.isArray(predictionData.ratings) && predictionData.ratings.length > arrIndex) {
+                        rating = predictionData.ratings[arrIndex];
+                    }
+                    if (text === null && predictionData.texts && Array.isArray(predictionData.texts) && predictionData.texts.length > arrIndex) {
+                        text = predictionData.texts[arrIndex];
+                    }
+
+                    // Fallback to inputData.answers array if needed
+                    if (rating === null && inputData.answers && Array.isArray(inputData.answers) && inputData.answers.length > arrIndex) {
+                        rating = inputData.answers[arrIndex];
+                    }
+                     // Fallback to inputData.texts array if needed
+                    if (text === null && inputData.texts && Array.isArray(inputData.texts) && inputData.texts.length > arrIndex) {
+                        text = inputData.texts[arrIndex];
+                    }
+
+                    // If we found anything, render it
+                    if (rating !== null || (text !== null && text.trim() !== "")) {
+                        hasData = true;
+                        const questionLabel = QUESTION_MAP[qKey] || `Question ${i}`;
+                        
+                        const item = document.createElement('li');
+                        item.className = 'qa-item';
+
+                        let htmlContent = `<strong>Q${i}: ${questionLabel}</strong>`;
+
+                        if (rating !== null) {
+                             htmlContent += `<p class="rating-answer">Rating: <span class="highlight">${rating} / 5</span></p>`;
+                        }
+
+                        item.innerHTML = htmlContent;
+                        qaContainer.appendChild(item);
+
+                        // If text exists, create a separate container for it so it's not concatenated
+                        if (text && text.trim() !== "") {
+                             const textItem = document.createElement('div');
+                             textItem.className = 'qa-text-context';
+                             // Add some inline styles for the text context to ensure it looks distinct
+                             textItem.style.marginTop = "5px";
+                             textItem.style.marginBottom = "25px";
+                             textItem.style.paddingLeft = "15px";
+                             textItem.style.borderLeft = "3px solid #007bff";
+                             textItem.style.color = "#555";
+                             textItem.style.backgroundColor = "#f9f9f9";
+                             textItem.style.padding = "10px 15px";
+                             textItem.style.borderRadius = "0 4px 4px 0";
+
+                             const textLabel = QUESTION_MAP[tKey] || "Detailed Answer";
+                             textItem.innerHTML = `<small><strong>${textLabel}</strong></small><br>"${text}"`;
+                             qaContainer.appendChild(textItem);
                         }
                     }
                 }
 
-                // 2. Render the Data
-                if (finalRatings.length > 0) {
-                    finalRatings.forEach((rating, index) => {
-                        // Map index (0-9) to Question Key (rating_1..10)
-                        const qNum = index + 1;
-                        const questionKey = `rating_${qNum}`;
-                        const questionLabel = QUESTION_MAP[questionKey] || `Question ${qNum}`;
-                        
-                        // Create List Item
-                        const item = document.createElement('li');
-                        item.className = 'qa-item';
-                        item.innerHTML = `
-                            <strong>Q${qNum}: ${questionLabel}</strong>
-                            <p class="rating-answer">Rating: <span class="highlight">${rating} / 5</span></p>
-                        `;
-                        qaContainer.appendChild(item);
-
-                        // Append Text Context if it exists
-                        if (finalTexts[index] && finalTexts[index].trim() !== "") {
-                            const textItem = document.createElement('div');
-                            textItem.className = 'qa-text-context';
-                            textItem.style.marginTop = "5px";
-                            textItem.style.marginBottom = "15px";
-                            textItem.style.paddingLeft = "15px";
-                            textItem.style.borderLeft = "3px solid #eee";
-                            textItem.style.color = "#555";
-                            
-                            const textKey = `text_${qNum}`;
-                            const textLabel = QUESTION_MAP[textKey] || "Context";
-                            
-                            textItem.innerHTML = `
-                                <small><em>${textLabel}</em></small><br>
-                                "${finalTexts[index]}"
-                            `;
-                            qaContainer.appendChild(textItem);
-                        }
-                    });
-                } else {
-                    qaContainer.innerHTML = '<li>No Q&A data found for this report.</li>';
+                if (!hasData) {
+                     qaContainer.innerHTML = '<li>No Q&A data found for this report.</li>';
                 }
             }
             // --- **** END OF NEW ROBUST LOGIC **** ---
