@@ -948,10 +948,6 @@ body.dashboard-page {
 .sidebar-nav a:hover {
     background-color: #e9ecef;
 }
-.sidebar-nav a.active {
-    background-color: #dee2e6;
-    font-weight: 600;
-}
 .sidebar-nav .nav-item.hidden {
     display: none;
 }
@@ -1148,6 +1144,21 @@ body.dashboard-page {
     color: white;
 }
 
+/* User profiles section */
+.user-profiles-section {
+    margin-bottom: 40px;
+}
+
+.user-profiles-section-title {
+    font-size: 1.4em;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 15px;
+    margin-top: 30px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e5e5e5;
+}
+
 /* User profiles grid */
 .user-profiles-grid {
     display: grid;
@@ -1300,7 +1311,6 @@ body.dashboard-page {
 @media screen and (max-width: 768px) {
     .dashboard-header {
         padding: 0 15px;
-        position: relative;
     }
     
     /* Show mobile hamburger */
@@ -1334,7 +1344,9 @@ body.dashboard-page {
     
     .dashboard-main {
         margin-left: 0;
+        margin-top: 70px;
         padding: 20px 15px;
+        min-height: auto;
     }
     
     /* --- ADDED: Main Site Mobile Nav --- */
@@ -1575,8 +1587,8 @@ img {
     display: grid;
     /* 100px for time column, 7 days */
     grid-template-columns: 100px repeat(7, 1fr); 
-    /* **** THIS IS THE CHANGED LINE (10 rows) **** */
-    grid-template-rows: repeat(10, 60px); 
+    /* **** Ensure we have rows for 08:00 - 18:00 (11 rows) **** */
+    grid-template-rows: repeat(11, 60px); 
     border: 1px solid #e0e0e0;
     border-top: none;
     border-radius: 0 0 8px 8px;
@@ -1608,40 +1620,43 @@ img {
 
 /* Placed Appointments */
 .appointment {
-    position: absolute;
-    margin-left: 5px;
-    margin-right: 5px;
-    
+    /* Use grid placement: the appointment is a grid child placed by JS-set CSS variables */
+    margin: 6px 8px;
     /* We use CSS variables set from JS */
     grid-column: var(--col-start);
     grid-row: var(--row-start) / var(--row-end);
-    
-    overflow: hidden;
-    z-index: 1; /* Place above grid lines */
+    overflow: visible;
+    z-index: 2; /* Place above background grid */
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
 }
 
 .patient-appointment {
     display: block;
     width: 100%;
     height: 100%;
-    background-color: #e3f2fd;
-    border: 1px solid #bbdefb;
-    border-radius: 4px;
-    padding: 4px 8px; /* <-- CHANGED */
+    background-color: #ffffff;
+    border: 1px solid rgba(16,24,40,0.06);
+    border-radius: 10px;
+    padding: 8px 12px; /* more comfortable padding */
     box-sizing: border-box;
     
-    color: #01579b;
+    color: #0f172a;
     text-decoration: none;
-    font-weight: 500;
-    font-size: 0.85em; /* <-- CHANGED */
+    font-weight: 600;
+    font-size: 0.9em;
+    box-shadow: 0 4px 12px rgba(2,6,23,0.06);
 
-    /* --- **** NEW TEXT OVERFLOW RULES **** --- */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* --- **** ALLOW TEXT TO WRAP AND EXPAND HEIGHT **** --- */
+    white-space: normal;
+    overflow: visible;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 .patient-appointment:hover {
-    background-color: #bbdefb;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(2,6,23,0.09);
 }
 .patient-appointment .appt-time {
     display: block;
@@ -1941,6 +1956,11 @@ img {
     border-bottom: 1px solid #e0e0e0;
     display: block;
     user-select: none; /* Prevent text selection */
+    text-decoration: none;
+}
+
+.sidebar-nav a.sidebar-category:hover {
+    background-color: #e0e0e0;
 }
 
 /* The sub-links (Pending/Confirmed) */
@@ -1950,6 +1970,7 @@ img {
     border-bottom: 1px solid #f0f0f0;
     background-color: #fff;
     color: #555;
+    font-weight: 400;
 }
 
 .sidebar-nav a.sub-link:hover {

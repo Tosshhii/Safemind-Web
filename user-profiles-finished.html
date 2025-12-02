@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SafeMind - User Profiles</title>
+    <title>SafeMind - Finished Consultations</title>
     <link rel="stylesheet" href="stylesheet.css?v=5">
 </head>
-
 <body class="dashboard-page">
     <header class="dashboard-header">
         <button class="hamburger-menu mobile-only" id="mobile-hamburger">
@@ -40,16 +39,17 @@
         <ul class="sidebar-nav">
             <li class="nav-item hidden"><a href="index.html">Home</a></li>
             <li class="nav-item hidden"><a href="about.html">About Us</a></li>
-            
+
             <li><div class="sidebar-category">Consultations</div></li>
-            
             <li><a href="pending-requests.html" class="sub-link">Pending Requests</a></li>
             <li><a href="confirmed-consultations.html" class="sub-link">Confirmed Consultations</a></li>
 
-            <li><div class="sidebar-category">User Profiles</div></li>
+            <li><div class="sidebar-category">Patient Profiles</div></li>
             <li><a href="user-profiles-today.html" class="sub-link">Scheduled Today</a></li>
-            <li><a href="user-profiles-finished.html" class="sub-link">Finished Consultations</a></li>
+            <li><a href="user-profiles-finished.html" class="sub-link active-sub">Finished Consultations</a></li>
             <li><a href="user-profiles-future.html" class="sub-link">Future Consultations</a></li>
+
+            <li><div class="sidebar-category">User Profiles</div></li>
             <li><a href="user-profiles-unscheduled.html" class="sub-link">Without Consultations</a></li>
 
             <li><a href="calendar.html" class="sidebar-category">Calendar</a></li>
@@ -58,7 +58,7 @@
 
     <main class="dashboard-main">
         <div class="dashboard-content">
-            <h1 class="dashboard-title">User Profiles</h1>
+            <h1 class="dashboard-title">Patients with Finished Consultations</h1>
 
             <div class="table-toolbar">
                 <label for="user-profiles-sort">Sort by:</label>
@@ -68,19 +68,9 @@
                 </select>
             </div>
 
-            <section class="user-profiles-section">
-                <h2 class="user-profiles-section-title">Users with Scheduled Consultations</h2>
-                <div id="user-profiles-scheduled" class="user-profiles-grid">
-                    <!-- Scheduled user cards will be injected by script.js -->
-                </div>
-            </section>
-
-            <section class="user-profiles-section">
-                <h2 class="user-profiles-section-title">Users Without Scheduled Consultations</h2>
-                <div id="user-profiles-unscheduled" class="user-profiles-grid">
-                    <!-- Unscheduled user cards will be injected by script.js -->
-                </div>
-            </section>
+            <div id="user-profiles-grid-finished" class="user-profiles-grid">
+                <!-- Finished consultation user cards will be injected by script.js -->
+            </div>
         </div>
     </main>
 
@@ -89,5 +79,3 @@
     <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
 </body>
 </html>
-
-

@@ -514,17 +514,20 @@ async function declineRequest(requestId) {
 let userProfilesSortMode = 'name'; // 'name' | 'latest'
 
 async function loadUserProfiles() {
-    const grid = document.getElementById('user-profiles-grid');
-    if (!grid) return;
+    const scheduledGrid = document.getElementById('user-profiles-scheduled');
+    const unscheduledGrid = document.getElementById('user-profiles-unscheduled');
+    if (!scheduledGrid || !unscheduledGrid) return;
 
-    grid.innerHTML = '<p>Loading user profiles...</p>';
+    scheduledGrid.innerHTML = '<p>Loading user profiles...</p>';
+    unscheduledGrid.innerHTML = '';
 
     try {
         const usersCol = collection(db, 'users');
         const snapshot = await getDocs(usersCol);
 
         if (snapshot.empty) {
-            grid.innerHTML = '<p>No users found.</p>';
+            scheduledGrid.innerHTML = '<p>No users found.</p>';
+            unscheduledGrid.innerHTML = '';
             return;
         }
 
@@ -551,7 +554,11 @@ async function loadUserProfiles() {
             });
         }
 
-        const cards = await Promise.all(users.map(async (user) => {
+        const scheduledUsers = [];
+        const unscheduledUsers = [];
+
+        // Process each user
+        for (const user of users) {
             const name = user.name || 'Unknown';
             const age = user.age ? `${user.age} yrs Old` : '-- yrs Old';
             const sex = user.sex || '--';
@@ -567,6 +574,8 @@ async function loadUserProfiles() {
 
             // Fetch the most recently created confirmed consultation for this user
             let scheduledText = 'No confirmed consultations yet';
+            let hasScheduledConsultation = false;
+            
             try {
                 const bookingsQ = query(
                     collection(db, 'bookedSlots'),
@@ -581,12 +590,13 @@ async function loadUserProfiles() {
                     const bDate = booking.date || '--/--/----';
                     const bTime = booking.time || '--:--';
                     scheduledText = `Last scheduled: ${bDate} at ${bTime}`;
+                    hasScheduledConsultation = true;
                 }
             } catch (e) {
                 console.error('Error loading latest booking for user', user.id, e);
             }
 
-            return `
+            const userCard = `
                 <article class="user-card">
                     <header class="user-card-header">
                         <h2>${name}</h2>
@@ -607,12 +617,322 @@ async function loadUserProfiles() {
                     </div>
                 </article>
             `;
-        }));
 
-        grid.innerHTML = cards.join('');
+            if (hasScheduledConsultation) {
+                scheduledUsers.push(userCard);
+            } else {
+                unscheduledUsers.push(userCard);
+            }
+        }
+
+        // Display scheduled users
+        if (scheduledUsers.length > 0) {
+            scheduledGrid.innerHTML = scheduledUsers.join('');
+        } else {
+            scheduledGrid.innerHTML = '<p>No users with scheduled consultations.</p>';
+        }
+
+        // Display unscheduled users
+        if (unscheduledUsers.length > 0) {
+            unscheduledGrid.innerHTML = unscheduledUsers.join('');
+        } else {
+            unscheduledGrid.innerHTML = '<p>No users without scheduled consultations.</p>';
+        }
+        // Handle URL hash navigation and active-sub highlighting for User Profiles sub-links
+        const handleUserProfilesHash = () => {
+            const hash = window.location.hash;
+            const scheduledNav = document.querySelector('a[href$="#scheduled"]');
+            const unscheduledNav = document.querySelector('a[href$="#unscheduled"]');
+
+            if (scheduledNav) scheduledNav.classList.remove('active-sub');
+            if (unscheduledNav) unscheduledNav.classList.remove('active-sub');
+
+            if (hash === '#scheduled') {
+                const el = document.getElementById('user-profiles-scheduled');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (scheduledNav) scheduledNav.classList.add('active-sub');
+            } else if (hash === '#unscheduled') {
+                const el = document.getElementById('user-profiles-unscheduled');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (unscheduledNav) unscheduledNav.classList.add('active-sub');
+            } else {
+                // No hash; leave both un-highlighted (or highlight default if needed)
+            }
+        };
+        // Run once and attach listener for later hash changes
+        handleUserProfilesHash();
+        window.addEventListener('hashchange', handleUserProfilesHash);
     } catch (error) {
         console.error('Error loading user profiles', error);
-        grid.innerHTML = '<p>Error loading user profiles. Check console for details.</p>';
+        scheduledGrid.innerHTML = '<p>Error loading user profiles. Check console for details.</p>';
+        unscheduledGrid.innerHTML = '';
+    }
+}
+
+// Load only scheduled or unscheduled user profiles into a single grid (used by separate pages)
+async function loadUserProfilesFiltered(filter) {
+    // filter: 'scheduled' | 'unscheduled'
+    const scheduledGrid = document.getElementById('user-profiles-grid-scheduled');
+    const unscheduledGrid = document.getElementById('user-profiles-grid-unscheduled');
+    const targetGrid = filter === 'scheduled' ? scheduledGrid : unscheduledGrid;
+    if (!targetGrid) return;
+
+    targetGrid.innerHTML = '<p>Loading user profiles...</p>';
+
+    try {
+        const usersCol = collection(db, 'users');
+        const snapshot = await getDocs(usersCol);
+
+        if (snapshot.empty) {
+            targetGrid.innerHTML = '<p>No users found.</p>';
+            return;
+        }
+
+        let users = snapshot.docs.map(docSnap => {
+            const data = docSnap.data();
+            return {
+                id: docSnap.id,
+                ...data
+            };
+        });
+
+        // Sort as in loadUserProfiles
+        if (userProfilesSortMode === 'latest') {
+            users.sort((a, b) => {
+                const aTs = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+                const bTs = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+                return bTs - aTs;
+            });
+        } else {
+            users.sort((a, b) => {
+                const aName = (a.name || '').toLowerCase();
+                const bName = (b.name || '').toLowerCase();
+                return aName.localeCompare(bName);
+            });
+        }
+
+        const cards = [];
+
+        for (const user of users) {
+            const name = user.name || 'Unknown';
+            const age = user.age ? `${user.age} yrs Old` : '-- yrs Old';
+            const sex = user.sex || '--';
+            const email = user.email || 'No email';
+            const city = user.city || '--';
+            const barangay = user.barangay || '--';
+            const province = user.province || '--';
+            const region = user.region || '--';
+
+            const locationParts = [barangay, city, province, region].filter(p => p !== '--');
+            const location = locationParts.length > 0 ? locationParts.join(', ') : 'Unknown Location';
+
+            // Check for latest confirmed booking
+            let scheduledText = 'No confirmed consultations yet';
+            let hasScheduledConsultation = false;
+            try {
+                const bookingsQ = query(
+                    collection(db, 'bookedSlots'),
+                    where('userId', '==', user.id),
+                    where('status', '==', 'confirmed'),
+                    orderBy('createdAt', 'desc'),
+                    limit(1)
+                );
+                const bookingSnap = await getDocs(bookingsQ);
+                if (!bookingSnap.empty) {
+                    const booking = bookingSnap.docs[0].data();
+                    const bDate = booking.date || '--/--/----';
+                    const bTime = booking.time || '--:--';
+                    scheduledText = `Last scheduled: ${bDate} at ${bTime}`;
+                    hasScheduledConsultation = true;
+                }
+            } catch (e) {
+                console.error('Error loading latest booking for user', user.id, e);
+            }
+
+            // Only include users that match the filter
+            if ((filter === 'scheduled' && !hasScheduledConsultation) || (filter === 'unscheduled' && hasScheduledConsultation)) {
+                continue;
+            }
+
+            const userCard = `
+                <article class="user-card">
+                    <header class="user-card-header">
+                        <h2>${name}</h2>
+                        <p class="user-card-meta">
+                            <span>${age}</span> • <span>${sex}</span>
+                        </p>
+                        <p class="user-card-location">${location}</p>
+                        <p class="user-card-email">${email}</p>
+                    </header>
+                    <div class="user-card-actions">
+                        <div class="user-card-name"><strong>${name}</strong></div>
+                        <div class="user-card-schedule">${scheduledText}</div>
+                    </div>
+                    <div class="user-card-button-wrapper">
+                        <a href="patient-profile.html?id=${encodeURIComponent(user.id)}" class="btn user-card-btn">
+                            View Profile &amp; Report
+                        </a>
+                    </div>
+                </article>
+            `;
+
+            cards.push(userCard);
+        }
+
+        if (cards.length > 0) {
+            targetGrid.innerHTML = cards.join('');
+        } else {
+            targetGrid.innerHTML = '<p>No users found for this filter.</p>';
+        }
+    } catch (error) {
+        console.error('Error loading user profiles (filtered)', error);
+        targetGrid.innerHTML = '<p>Error loading user profiles. Check console for details.</p>';
+    }
+}
+
+// Load users grouped by consultation date status: 'today', 'finished', or 'future'
+async function loadUserProfilesByConsultationStatus(status) {
+    // status: 'today' | 'finished' | 'future'
+    const gridId = {
+        'today': 'user-profiles-grid-today',
+        'finished': 'user-profiles-grid-finished',
+        'future': 'user-profiles-grid-future'
+    }[status];
+    const targetGrid = document.getElementById(gridId);
+    if (!targetGrid) return;
+
+    targetGrid.innerHTML = '<p>Loading user profiles...</p>';
+
+    try {
+        const usersCol = collection(db, 'users');
+        const snapshot = await getDocs(usersCol);
+
+        if (snapshot.empty) {
+            targetGrid.innerHTML = '<p>No users found.</p>';
+            return;
+        }
+
+        let users = snapshot.docs.map(docSnap => {
+            const data = docSnap.data();
+            return { id: docSnap.id, ...data };
+        });
+
+        // Sort by name or latest
+        if (userProfilesSortMode === 'latest') {
+            users.sort((a, b) => {
+                const aTs = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+                const bTs = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+                return bTs - aTs;
+            });
+        } else {
+            users.sort((a, b) => {
+                const aName = (a.name || '').toLowerCase();
+                const bName = (b.name || '').toLowerCase();
+                return aName.localeCompare(bName);
+            });
+        }
+
+        const cards = [];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        for (const user of users) {
+            const name = user.name || 'Unknown';
+            const age = user.age ? `${user.age} yrs Old` : '-- yrs Old';
+            const sex = user.sex || '--';
+            const email = user.email || 'No email';
+            const city = user.city || '--';
+            const barangay = user.barangay || '--';
+            const province = user.province || '--';
+            const region = user.region || '--';
+
+            const locationParts = [barangay, city, province, region].filter(p => p !== '--');
+            const location = locationParts.length > 0 ? locationParts.join(', ') : 'Unknown Location';
+
+            // Fetch latest confirmed booking
+            let latestBooking = null;
+            try {
+                const bookingsQ = query(
+                    collection(db, 'bookedSlots'),
+                    where('userId', '==', user.id),
+                    where('status', '==', 'confirmed'),
+                    orderBy('createdAt', 'desc'),
+                    limit(1)
+                );
+                const bookingSnap = await getDocs(bookingsQ);
+                if (!bookingSnap.empty) {
+                    latestBooking = bookingSnap.docs[0].data();
+                }
+            } catch (e) {
+                console.error('Error loading booking for user', user.id, e);
+            }
+
+            if (!latestBooking) continue; // Skip users without confirmed bookings
+
+            // Parse booking date
+            const dParts = latestBooking.date ? latestBooking.date.split('/') : [];
+            let bookingDate = null;
+            if (dParts.length === 3) {
+                bookingDate = new Date(
+                    parseInt(dParts[2], 10),
+                    parseInt(dParts[1], 10) - 1,
+                    parseInt(dParts[0], 10)
+                );
+                bookingDate.setHours(0, 0, 0, 0);
+            }
+
+            if (!bookingDate) continue;
+
+            // Filter by status
+            let matchesStatus = false;
+            if (status === 'today' && bookingDate.getTime() === today.getTime()) {
+                matchesStatus = true;
+            } else if (status === 'finished' && bookingDate < today) {
+                matchesStatus = true;
+            } else if (status === 'future' && bookingDate >= tomorrow) {
+                matchesStatus = true;
+            }
+
+            if (!matchesStatus) continue;
+
+            const scheduledText = `Scheduled: ${latestBooking.date} at ${latestBooking.time || '--:--'}`;
+
+            const userCard = `
+                <article class="user-card">
+                    <header class="user-card-header">
+                        <h2>${name}</h2>
+                        <p class="user-card-meta">
+                            <span>${age}</span> • <span>${sex}</span>
+                        </p>
+                        <p class="user-card-location">${location}</p>
+                        <p class="user-card-email">${email}</p>
+                    </header>
+                    <div class="user-card-actions">
+                        <div class="user-card-name"><strong>${name}</strong></div>
+                        <div class="user-card-schedule">${scheduledText}</div>
+                    </div>
+                    <div class="user-card-button-wrapper">
+                        <a href="patient-profile.html?id=${encodeURIComponent(user.id)}" class="btn user-card-btn">
+                            View Profile &amp; Report
+                        </a>
+                    </div>
+                </article>
+            `;
+
+            cards.push(userCard);
+        }
+
+        if (cards.length > 0) {
+            targetGrid.innerHTML = cards.join('');
+        } else {
+            const statusLabel = { 'today': 'scheduled today', 'finished': 'with finished consultations', 'future': 'with future consultations' }[status];
+            targetGrid.innerHTML = `<p>No users ${statusLabel}.</p>`;
+        }
+    } catch (error) {
+        console.error('Error loading user profiles by status', error);
+        targetGrid.innerHTML = '<p>Error loading user profiles. Check console for details.</p>';
     }
 }
 
@@ -1189,9 +1509,21 @@ document.addEventListener('DOMContentLoaded', function() {
     if (hasPendingTable || hasPendingList) {
         loadPendingRequests();
     }
-    // 5. User Profiles grid
-    if (document.getElementById('user-profiles-grid')) {
-        loadUserProfiles();
+    // 5. User Profiles grid (support separate pages: by status or scheduled/unscheduled)
+    if (document.getElementById('user-profiles-grid-today')) {
+        loadUserProfilesByConsultationStatus('today');
+    }
+    if (document.getElementById('user-profiles-grid-finished')) {
+        loadUserProfilesByConsultationStatus('finished');
+    }
+    if (document.getElementById('user-profiles-grid-future')) {
+        loadUserProfilesByConsultationStatus('future');
+    }
+    if (document.getElementById('user-profiles-grid-scheduled')) {
+        loadUserProfilesFiltered('scheduled');
+    }
+    if (document.getElementById('user-profiles-grid-unscheduled')) {
+        loadUserProfilesFiltered('unscheduled');
     }
     // --- END UPDATED ---
 
@@ -1256,6 +1588,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Improved back-link behavior: prefer history.back() to preserve user context (e.g. Calendar)
+    const backLinks = document.querySelectorAll('.back-link');
+    backLinks.forEach((bl) => {
+        bl.addEventListener('click', (e) => {
+            // Only intercept left-clicks without modifier keys
+            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            // If there's a history entry to go back to, use it to preserve the previous page state
+            try {
+                if (window.history.length > 1) {
+                    window.history.back();
+                    return;
+                }
+            } catch (err) {
+                // ignore and fallback
+            }
+
+            // Fallback: navigate to the href on the anchor (default page)
+            const href = bl.getAttribute('href') || 'confirmed-consultations.html';
+            window.location.href = href;
+        });
+    });
+
     // --- Forgot Password Logic ---
     const forgotPasswordLink = document.querySelector('.remember-forgot a');
     if (forgotPasswordLink) {
@@ -1310,7 +1665,19 @@ document.addEventListener('DOMContentLoaded', function() {
         userProfilesSortMode = userProfilesSortSelect.value || 'name';
         userProfilesSortSelect.addEventListener('change', () => {
             userProfilesSortMode = userProfilesSortSelect.value || 'name';
-            loadUserProfiles();
+            
+            // Determine which loader to call based on which grid exists
+            if (document.getElementById('user-profiles-grid')) {
+                loadUserProfiles();
+            } else if (document.getElementById('user-profiles-grid-today')) {
+                loadUserProfilesByConsultationStatus('today');
+            } else if (document.getElementById('user-profiles-grid-finished')) {
+                loadUserProfilesByConsultationStatus('finished');
+            } else if (document.getElementById('user-profiles-grid-future')) {
+                loadUserProfilesByConsultationStatus('future');
+            } else if (document.getElementById('user-profiles-grid-unscheduled')) {
+                loadUserProfilesFiltered('unscheduled');
+            }
         });
     }
 
