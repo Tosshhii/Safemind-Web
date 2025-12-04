@@ -1549,6 +1549,24 @@ document.addEventListener('DOMContentLoaded', function() {
         });
      }
 
+    // --- SIDEBAR DROPDOWNS (Consultations, Patient Profiles, User Profiles) ---
+    // Select all buttons that are intended to be dropdown triggers
+    const dropdownTriggers = document.querySelectorAll('button.sidebar-category');
+
+    dropdownTriggers.forEach(trigger => {
+        trigger.addEventListener('click', function() {
+            // Find the next sibling which should be the UL menu
+            const menu = this.nextElementSibling;
+            if (menu && menu.classList.contains('dropdown-menu')) {
+                // Toggle visibility
+                menu.classList.toggle('hidden');
+
+                // Optional: Toggle active state on button for styling (e.g. arrow rotation)
+                this.classList.toggle('active');
+            }
+        });
+    });
+
     // --- NEW: Mobile Nav Toggle (Main Site) ---
     const mainHamburger = document.getElementById('mobile-hamburger-main');
     const mainNav = document.getElementById('primary-navigation'); 
