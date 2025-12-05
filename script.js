@@ -364,16 +364,19 @@ async function loadPendingRequests() {
             const req = item.data;
             const patientId = req.userId || req.userUID || null;
             let patientName = req.name || 'Unknown Patient';
+            let patientEmail = '';
 
             if (patientId) {
                 try {
                     const uRef = doc(db, 'users', patientId);
                     const uSnap = await getDoc(uRef);
                     if (uSnap.exists()) {
-                        patientName = uSnap.data().name || patientName;
+                        const userData = uSnap.data();
+                        patientName = userData.name || patientName;
+                        patientEmail = userData.email || '';
                     }
                 } catch (e) {
-                    console.error('Failed to fetch patient name for pending request', e);
+                    console.error('Failed to fetch patient data for pending request', e);
                 }
             }
 
@@ -381,9 +384,10 @@ async function loadPendingRequests() {
             const time = req.time || req.requestTime || '--:--';
 
             // Render as table row or card depending on layout
+            // Added data-patient-email and data-patient-name attributes
             if (useTable) {
                 return `
-                    <tr class="pending-item" data-request-id="${item.id}">
+                    <tr class="pending-item" data-request-id="${item.id}" data-patient-email="${patientEmail}" data-patient-name="${patientName}">
                         <td data-label="Date">${date}</td>
                         <td data-label="Time">${time}</td>
                         <td data-label="Patient"><strong>${patientName}</strong></td>
@@ -395,7 +399,7 @@ async function loadPendingRequests() {
                 `;
             } else {
                 return `
-                    <div class="pending-item" data-request-id="${item.id}">
+                    <div class="pending-item" data-request-id="${item.id}" data-patient-email="${patientEmail}" data-patient-name="${patientName}">
                         <div class="pending-meta"><strong>${patientName}</strong> — ${date} ${time}</div>
                         <div class="pending-actions">
                             <button class="btn confirm-request">Confirm</button>
@@ -413,7 +417,9 @@ async function loadPendingRequests() {
             btn.addEventListener('click', async (e) => {
                 const item = e.target.closest('.pending-item');
                 const requestId = item.getAttribute('data-request-id');
-                await confirmRequest(requestId);
+                const patientEmail = item.getAttribute('data-patient-email');
+                const patientName = item.getAttribute('data-patient-name');
+                await confirmRequest(requestId, patientEmail, patientName);
             });
         });
         
@@ -454,7 +460,22 @@ async function loadPendingRequests() {
     }
 }
 
-async function confirmRequest(requestId) {
+// Mock email sending function
+async function sendConfirmationEmail(email, name) {
+    const subject = "Consultation Confirmed - SafeMind";
+    const body = `Dear ${name},\n\nYour consultation request has been successfully confirmed and your consultation schedule is now booked.\n\nThank you,\nThe SafeMind Team`;
+
+    console.log(`[MOCK EMAIL SEND]`);
+    console.log(`To: ${email}`);
+    console.log(`Subject: ${subject}`);
+    console.log(`Body:\n${body}`);
+
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return true;
+}
+
+async function confirmRequest(requestId, patientEmail, patientName) {
     if (!confirm('Confirm this consultation and add to calendar?')) return;
     
     try {
@@ -463,6 +484,15 @@ async function confirmRequest(requestId) {
         if (!reqSnap.exists()) return alert('Request not found.');
 
         const req = reqSnap.data();
+
+        // Send email first (mock)
+        if (patientEmail) {
+            await sendConfirmationEmail(patientEmail, patientName);
+            // Alert user feedback as requested
+            alert("Email Sent");
+        } else {
+            console.warn("No patient email available, skipping notification.");
+        }
 
         // Add to bookedSlots with explicit strings
         await addDoc(collection(db, 'bookedSlots'), {
@@ -1544,10 +1574,39 @@ document.addEventListener('DOMContentLoaded', function() {
     const mobileHamburger = document.getElementById('mobile-hamburger');
     const dashboardSidebar = document.querySelector('.dashboard-sidebar');
     if (mobileHamburger && dashboardSidebar) {
-        mobileHamburger.addEventListener('click', function() {
+        mobileHamburger.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent immediate closing due to document click
             dashboardSidebar.classList.toggle('open');
         });
+
+        // Close sidebar when clicking outside
+        document.addEventListener('click', function(e) {
+            if (dashboardSidebar.classList.contains('open')) {
+                // Check if click is outside sidebar and not on the hamburger button
+                if (!dashboardSidebar.contains(e.target) && !mobileHamburger.contains(e.target)) {
+                    dashboardSidebar.classList.remove('open');
+                }
+            }
+        });
      }
+
+    // --- SIDEBAR DROPDOWNS (Consultations, Patient Profiles, User Profiles) ---
+    // Select all buttons that are intended to be dropdown triggers
+    const dropdownTriggers = document.querySelectorAll('button.sidebar-category');
+
+    dropdownTriggers.forEach(trigger => {
+        trigger.addEventListener('click', function() {
+            // Find the next sibling which should be the UL menu
+            const menu = this.nextElementSibling;
+            if (menu && menu.classList.contains('dropdown-menu')) {
+                // Toggle visibility
+                menu.classList.toggle('hidden');
+
+                // Optional: Toggle active state on button for styling (e.g. arrow rotation)
+                this.classList.toggle('active');
+            }
+        });
+    });
 
     // --- NEW: Mobile Nav Toggle (Main Site) ---
     const mainHamburger = document.getElementById('mobile-hamburger-main');

@@ -1985,3 +1985,61 @@ img {
     background-color: #eef7ff;
     border-left: 4px solid #007bff;
 }
+/* Sidebar Dropdown Styles */
+
+/* Change sidebar-category to look like a button */
+button.sidebar-category {
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-bottom: 1px solid #e0e0e0;
+    cursor: pointer;
+    font-family: inherit;
+    /* Maintain existing padding/colors */
+    padding: 15px 20px;
+    background-color: #eee;
+    color: #333;
+    font-weight: 700;
+    font-size: 1em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+button.sidebar-category:hover {
+    background-color: #e0e0e0;
+}
+
+button.sidebar-category:focus {
+    outline: none;
+}
+
+/* Container for the sub-links */
+.dropdown-menu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: block;
+    overflow: hidden;
+}
+
+/* Hidden state */
+.dropdown-menu.hidden {
+    display: none;
+}
+
+/* Optional: Arrow rotation if we add an icon later, or just visual feedback */
+button.sidebar-category.active {
+    background-color: #e0e0e0;
+}
+
+/* If we want to add an arrow icon via CSS */
+button.sidebar-category::after {
+    content: '▼';
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+}
+
+button.sidebar-category.active::after {
+    transform: rotate(180deg);
+}
