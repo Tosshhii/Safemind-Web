@@ -1544,10 +1544,39 @@ document.addEventListener('DOMContentLoaded', function() {
     const mobileHamburger = document.getElementById('mobile-hamburger');
     const dashboardSidebar = document.querySelector('.dashboard-sidebar');
     if (mobileHamburger && dashboardSidebar) {
-        mobileHamburger.addEventListener('click', function() {
+        mobileHamburger.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent immediate closing due to document click
             dashboardSidebar.classList.toggle('open');
         });
+
+        // Close sidebar when clicking outside
+        document.addEventListener('click', function(e) {
+            if (dashboardSidebar.classList.contains('open')) {
+                // Check if click is outside sidebar and not on the hamburger button
+                if (!dashboardSidebar.contains(e.target) && !mobileHamburger.contains(e.target)) {
+                    dashboardSidebar.classList.remove('open');
+                }
+            }
+        });
      }
+
+    // --- SIDEBAR DROPDOWNS (Consultations, Patient Profiles, User Profiles) ---
+    // Select all buttons that are intended to be dropdown triggers
+    const dropdownTriggers = document.querySelectorAll('button.sidebar-category');
+
+    dropdownTriggers.forEach(trigger => {
+        trigger.addEventListener('click', function() {
+            // Find the next sibling which should be the UL menu
+            const menu = this.nextElementSibling;
+            if (menu && menu.classList.contains('dropdown-menu')) {
+                // Toggle visibility
+                menu.classList.toggle('hidden');
+
+                // Optional: Toggle active state on button for styling (e.g. arrow rotation)
+                this.classList.toggle('active');
+            }
+        });
+    });
 
     // --- NEW: Mobile Nav Toggle (Main Site) ---
     const mainHamburger = document.getElementById('mobile-hamburger-main');
