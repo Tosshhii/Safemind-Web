@@ -19,7 +19,7 @@
             <div class="user-avatar">
                 <ion-icon name="person-circle"></ion-icon>
             </div>
-            
+
             <div class="profile-dropdown">
                 <div class="profile-info">
                     <ion-icon name="person-circle-outline"></ion-icon>
@@ -44,19 +44,30 @@
         <ul class="sidebar-nav">
             <li class="nav-item hidden"><a href="index.html">Home</a></li>
             <li class="nav-item hidden"><a href="about.html">About Us</a></li>
-            
-            <li><div class="sidebar-category">Consultations</div></li>
-            
-            <li><a href="pending-requests.html" class="sub-link">Pending Requests</a></li>
-            <li><a href="confirmed-consultations.html" class="sub-link">Confirmed Consultations</a></li>
 
-            <li><div class="sidebar-category">Patient Profiles</div></li>
-            <li><a href="user-profiles-today.html" class="sub-link">Scheduled Today</a></li>
-            <li><a href="user-profiles-finished.html" class="sub-link">Finished Consultations</a></li>
-            <li><a href="user-profiles-future.html" class="sub-link">Future Consultations</a></li>
+            <li>
+                <button class="sidebar-category">Consultations</button>
+                <ul class="dropdown-menu hidden">
+                    <li><a href="pending-requests.html" class="sub-link">Pending Requests</a></li>
+                    <li><a href="confirmed-consultations.html" class="sub-link">Confirmed Consultations</a></li>
+                </ul>
+            </li>
 
-            <li><div class="sidebar-category">User Profiles</div></li>
-            <li><a href="user-profiles-unscheduled.html" class="sub-link">Without Consultations</a></li>
+            <li>
+                <button class="sidebar-category">Patient Profiles</button>
+                <ul class="dropdown-menu hidden">
+                    <li><a href="user-profiles-today.html" class="sub-link">Scheduled Today</a></li>
+                    <li><a href="user-profiles-finished.html" class="sub-link">Finished Consultations</a></li>
+                    <li><a href="user-profiles-future.html" class="sub-link">Future Consultations</a></li>
+                </ul>
+            </li>
+
+            <li>
+                <button class="sidebar-category">User Profiles</button>
+                <ul class="dropdown-menu hidden">
+                    <li><a href="user-profiles-unscheduled.html" class="sub-link">Without Consultations</a></li>
+                </ul>
+            </li>
 
             <li><a href="calendar.html" class="sidebar-category">Calendar</a></li>
         </ul>
@@ -64,7 +75,7 @@
 
     <main class="dashboard-main">
         <div class="calendar-content">
-            
+
             <div class="calendar-nav">
                 <button id="prev-week" class="calendar-nav-btn">
                     <ion-icon name="chevron-back"></ion-icon> Previous
@@ -74,7 +85,7 @@
                     Next <ion-icon name="chevron-forward"></ion-icon>
                 </button>
             </div>
-            
+
             <div class="calendar-grid">
                 <div id="calendar-header" class="calendar-header"></div>
                 <div id="calendar-body" class="calendar-body">
