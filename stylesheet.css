@@ -2153,7 +2153,7 @@ button.sidebar-category.active::after {
 .chart-bar[style*="width: 0"], .chart-bar[style*="width: 1"], .chart-bar[style*="width: 2"], .chart-bar[style*="width: 3"], .chart-bar[style*="width: 4"], .chart-bar[style*="width: 5"], .chart-bar[style*="width: 6"], .chart-bar[style*="width: 7"], .chart-bar[style*="width: 8"], .chart-bar[style*="width: 9"] {
     overflow: visible;
 }
-.chart-bar[style*="width: 0"] .chart-bar-value, .chart-bar[style*="width: 1"] .chart-bar-value, ... {
+.chart-bar[style*="width: 0"] .chart-bar-value, .chart-bar[style*="width: 1"] .chart-bar-value {
     right: -25px;
     color: #333;
 }
