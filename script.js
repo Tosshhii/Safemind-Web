@@ -2,7 +2,6 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
-import emailjs from 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/+esm';
 
 // Auth imports (Email/Password, Remember Me, Forgot Password)
 import {
@@ -32,8 +31,9 @@ import {
     where, // Added for dashboard query
     doc,     
     getDoc,  
-    limit  
-    , addDoc, updateDoc, serverTimestamp
+    limit,
+    onSnapshot,
+    addDoc, updateDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js"; 
 // --- END FIRESTORE IMPORTS ---
 
@@ -59,7 +59,6 @@ const analytics = getAnalytics(app);
 const db = getFirestore(app); // Initialize Firestore
 // --- END: Firebase Initialization ---
 
-emailjs.init("jmItGItu0nibZ2mAX");
 
 // --- **** NEW QUESTION MAP (FROM YOUR LIST) **** ---
 const QUESTION_MAP = {
@@ -462,7 +461,22 @@ async function loadPendingRequests() {
     }
 }
 
-async function confirmRequest(requestId) {
+// Mock email sending function
+async function sendConfirmationEmail(email, name) {
+    const subject = "Consultation Confirmed - SafeMind";
+    const body = `Dear ${name},\n\nYour consultation request has been successfully confirmed and your consultation schedule is now booked.\n\nThank you,\nThe SafeMind Team`;
+
+    console.log(`[MOCK EMAIL SEND]`);
+    console.log(`To: ${email}`);
+    console.log(`Subject: ${subject}`);
+    console.log(`Body:\n${body}`);
+
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return true;
+}
+
+async function confirmRequest(requestId, patientEmail, patientName) {
     if (!confirm('Confirm this consultation and add to calendar?')) return;
     
     try {
@@ -481,29 +495,16 @@ async function confirmRequest(requestId) {
             console.warn("No patient email available, skipping notification.");
         }
 
-        // 1. Attempt to send the email
-        if (patientEmail) {
-            const emailSent = await sendConfirmationEmail(patientEmail, patientName);
-            if (emailSent) {
-                alert("Confirmation Email Sent to Patient.");
-            } else {
-                alert("Warning: The email failed to send, but we will proceed with booking.");
-            }
-        } else {
-            console.warn("No patient email available, skipping notification.");
-        }
-
-        // 2. Add to bookedSlots
+        // Add to bookedSlots with explicit strings
         await addDoc(collection(db, 'bookedSlots'), {
-            date: req.date, 
-            time: req.time, 
+            date: req.date, // "28/11/2025"
+            time: req.time, // "4:00-6:00"
             userId: req.userId || req.userUID || null,
             status: 'confirmed',
             createdAt: serverTimestamp(),
             createdBy: auth.currentUser ? auth.currentUser.uid : null
         });
 
-        // 3. Update the request status
         await updateDoc(reqRef, {
             status: 'confirmed',
             confirmedAt: serverTimestamp(),
@@ -1247,43 +1248,52 @@ function showScrim(show){
     if (show) scrim.classList.add('visible'); else scrim.classList.remove('visible');
 }
 
-// --- Helper: Add Progress Bar ---
-function addProgressBar(label, percentage) {
-    const chartContainer = document.getElementById('progress-chart');
+// --- Helper: Render Full Chart ---
+function renderFullChart(chartContainer, dataArray) {
     if (!chartContainer) return;
 
-    const row = document.createElement('div');
-    row.className = 'chart-row';
+    // Clear existing
+    chartContainer.innerHTML = '';
 
-    // Y-Axis Label
-    const labelDiv = document.createElement('div');
-    labelDiv.className = 'chart-label';
-    labelDiv.textContent = label;
+    dataArray.forEach(item => {
+        const percentage = Math.round(item.score);
 
-    // Bar Container
-    const barContainer = document.createElement('div');
-    barContainer.className = 'chart-bar-container';
+        const row = document.createElement('div');
+        row.className = 'chart-row';
 
-    // The Bar itself
-    const bar = document.createElement('div');
-    bar.className = 'chart-bar';
-    bar.style.width = '0%'; // Start at 0 for animation
+        // Y-Axis Label
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'chart-label';
+        labelDiv.textContent = item.label;
+        if (item.notes) {
+            labelDiv.title = item.notes; // Tooltip for notes
+        }
 
-    // Value text inside/next to bar
-    const valueText = document.createElement('span');
-    valueText.className = 'chart-bar-value';
-    valueText.textContent = `${percentage}%`;
+        // Bar Container
+        const barContainer = document.createElement('div');
+        barContainer.className = 'chart-bar-container';
 
-    bar.appendChild(valueText);
-    barContainer.appendChild(bar);
-    row.appendChild(labelDiv);
-    row.appendChild(barContainer);
+        // The Bar itself
+        const bar = document.createElement('div');
+        bar.className = 'chart-bar';
+        bar.style.width = '0%'; // Start at 0 for animation
 
-    chartContainer.appendChild(row);
+        // Value text inside/next to bar
+        const valueText = document.createElement('span');
+        valueText.className = 'chart-bar-value';
+        valueText.textContent = `${percentage}%`;
 
-    // Trigger animation
-    requestAnimationFrame(() => {
-        bar.style.width = `${percentage}%`;
+        bar.appendChild(valueText);
+        barContainer.appendChild(bar);
+        row.appendChild(labelDiv);
+        row.appendChild(barContainer);
+
+        chartContainer.appendChild(row);
+
+        // Trigger animation
+        requestAnimationFrame(() => {
+            bar.style.width = `${percentage}%`;
+        });
     });
 }
 // --- End Helper Functions ---
@@ -1365,6 +1375,13 @@ async function loadPatientProfile() {
     const progressChart = document.getElementById('progress-chart');
     const addFindingsBtn = document.getElementById('add-findings-btn');
     const finishProgressBtn = document.getElementById('finish-progress-btn');
+
+    // Findings Card elements
+    const findingsCard = document.getElementById('consultation-findings-card');
+    const saveEntryBtn = document.getElementById('save-entry-btn');
+    const cancelEntryBtn = document.getElementById('cancel-entry-btn');
+    const findingsLog = document.getElementById('findings-log');
+    const severityScoreInput = document.getElementById('severity-score');
 
     // --- Get all NEW modal elements ---
     const modalPatientName = document.getElementById('modal-patient-name');
@@ -1463,20 +1480,62 @@ async function loadPatientProfile() {
             if (progressSummary) {
                 progressSummary.textContent = `${displayPercent}% (${severityText})`;
             }
-            if (progressChart) {
-                // Clear existing chart (except if we want to persist dynamically added ones locally,
-                // but since we re-fetch on load, let's rebuild it cleanly).
-                // NOTE: The request says "must automatically initialize with existing AI result".
-                // Since we don't have a backend specifically for follow-ups yet, we will start with the AI result.
-                // Any 'new' data added via button is transient in this session unless we store it.
-                // For this task, assuming session-based or simple visual demo is sufficient, or we store in local var.
-                // But the best approach for "Continuity" is to render the base bar here.
 
-                // Check if we already rendered (to avoid duplicates if called multiple times, though loadPatientProfile is usually once)
-                if (!progressChart.hasChildNodes()) {
-                    addProgressBar("AI assessment result", displayPercent);
-                }
+            // --- DYNAMIC CHART LOGIC ---
+            // We now have the base AI score (displayPercent).
+            // We need to subscribe to the patient's progress_history subcollection.
+            if (progressChart) {
+                // Clear chart initially
+                progressChart.innerHTML = '';
+
+                // 1. Add the initial AI Assessment bar immediately
+                // This ensures the "AI assessment result" is always index 0.
+                const initialDataPoint = {
+                    label: "AI Assessment Result",
+                    score: displayPercent,
+                    timestamp: predictionData.timestamp || serverTimestamp() // Fallback
+                };
+
+                // Store in a local variable to combine with realtime updates
+                let allProgressData = [initialDataPoint];
+
+                // Render initial state
+                renderFullChart(progressChart, allProgressData);
+
+                // 2. Set up Realtime Listener for History
+                const historyRef = collection(db, "users", patientId, "progress_history");
+                const qHistory = query(historyRef, orderBy("timestamp", "asc"));
+
+                onSnapshot(qHistory, (snapshot) => {
+                    const historyData = snapshot.docs.map((doc, index) => {
+                        const d = doc.data();
+                        return {
+                            label: `Follow-up ${index + 1}`,
+                            score: d.severity,
+                            timestamp: d.timestamp,
+                            notes: d.notes
+                        };
+                    });
+
+                    // Combine AI result + History
+                    // (AI result is always first)
+                    const combinedData = [initialDataPoint, ...historyData];
+
+                    // Re-render chart with new data
+                    renderFullChart(progressChart, combinedData);
+
+                    // Update summary to latest status
+                    if (combinedData.length > 0) {
+                        const latest = combinedData[combinedData.length - 1];
+                        if (progressSummary) {
+                            progressSummary.textContent = `${latest.score}% (${latest.label})`;
+                        }
+                    }
+                }, (error) => {
+                    console.error("Error listening to progress history:", error);
+                });
             }
+            // --- END DYNAMIC CHART LOGIC ---
 
             // --- Populate modal with analysis data ---
             if (modalSeverityText) modalSeverityText.textContent = severityText;
@@ -1785,22 +1844,63 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- Progress Card Action Buttons ---
-    const addFindingsBtn = document.getElementById('add-findings-btn');
-    if (addFindingsBtn) {
-        addFindingsBtn.addEventListener('click', () => {
-            const input = prompt("Enter new severity percentage (0-100):");
-            if (input !== null) {
-                const val = parseFloat(input);
-                if (!isNaN(val) && val >= 0 && val <= 100) {
-                    const label = `Follow-up ${document.querySelectorAll('.chart-row').length}`;
-                    addProgressBar(label, Math.round(val));
 
-                    // Update summary too? Maybe
-                    const summary = document.getElementById('progress-summary');
-                    if(summary) summary.textContent = `${Math.round(val)}% (Follow-up)`;
-                } else {
-                    alert("Please enter a valid number between 0 and 100.");
-                }
+    // 1. Show Form
+    if (addFindingsBtn && findingsCard) {
+        addFindingsBtn.addEventListener('click', () => {
+            findingsCard.classList.remove('hidden');
+            // Scroll to form
+            findingsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+    }
+
+    // 2. Hide Form (Cancel)
+    if (cancelEntryBtn && findingsCard) {
+        cancelEntryBtn.addEventListener('click', () => {
+            findingsCard.classList.add('hidden');
+            if (findingsLog) findingsLog.value = '';
+            if (severityScoreInput) severityScoreInput.value = '';
+        });
+    }
+
+    // 3. Save Entry
+    if (saveEntryBtn) {
+        saveEntryBtn.addEventListener('click', async () => {
+            const notes = findingsLog ? findingsLog.value.trim() : '';
+            const scoreStr = severityScoreInput ? severityScoreInput.value : '';
+            const score = parseFloat(scoreStr);
+
+            if (isNaN(score) || score < 0 || score > 100) {
+                alert("Please enter a valid severity score between 0 and 100.");
+                return;
+            }
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const patientId = urlParams.get('id');
+            if (!patientId) {
+                alert("Error: No patient ID found.");
+                return;
+            }
+
+            try {
+                const historyRef = collection(db, "users", patientId, "progress_history");
+                await addDoc(historyRef, {
+                    severity: score,
+                    notes: notes,
+                    timestamp: serverTimestamp(),
+                    recordedBy: auth.currentUser ? auth.currentUser.uid : null
+                });
+
+                alert("Findings recorded successfully!");
+
+                // Hide and Clear
+                if (findingsCard) findingsCard.classList.add('hidden');
+                if (findingsLog) findingsLog.value = '';
+                if (severityScoreInput) severityScoreInput.value = '';
+
+            } catch (error) {
+                console.error("Error saving findings:", error);
+                alert("Failed to save findings. See console for details.");
             }
         });
     }
