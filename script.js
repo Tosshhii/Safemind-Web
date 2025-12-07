@@ -1290,10 +1290,10 @@ function renderFullChart(chartContainer, dataArray) {
 
         chartContainer.appendChild(row);
 
-        // Trigger animation
-        requestAnimationFrame(() => {
-            bar.style.width = `${percentage}%`;
-        });
+        // Trigger animation with forced reflow
+        setTimeout(() => {
+             bar.style.width = `${percentage}%`;
+        }, 50);
     });
 }
 // --- End Helper Functions ---
@@ -1382,6 +1382,11 @@ async function loadPatientProfile() {
     const cancelEntryBtn = document.getElementById('cancel-entry-btn');
     const findingsLog = document.getElementById('findings-log');
     const severityScoreInput = document.getElementById('severity-score');
+
+    // Add loading state to chart
+    if (progressChart) {
+        progressChart.innerHTML = '<p style="padding: 10px; color: #666;">Loading progress history...</p>';
+    }
 
     // --- Get all NEW modal elements ---
     const modalPatientName = document.getElementById('modal-patient-name');
