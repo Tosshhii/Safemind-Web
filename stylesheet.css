@@ -2157,3 +2157,48 @@ button.sidebar-category.active::after {
     right: -25px;
     color: #333;
 }
+
+/* Consultation Findings Card Styles */
+.consultation-findings-card {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+    margin-top: 10px;
+}
+
+.consultation-findings-card.hidden {
+    display: none;
+}
+
+.consultation-findings-card h3 {
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.input-group {
+    margin-bottom: 15px;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #555;
+}
+
+.input-group textarea,
+.input-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
