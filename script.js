@@ -2,6 +2,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
+import emailjs from 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/+esm';
 
 // Auth imports (Email/Password, Remember Me, Forgot Password)
 import {
@@ -58,6 +59,7 @@ const analytics = getAnalytics(app);
 const db = getFirestore(app); // Initialize Firestore
 // --- END: Firebase Initialization ---
 
+emailjs.init("jmItGItu0nibZ2mAX");
 
 // --- **** NEW QUESTION MAP (FROM YOUR LIST) **** ---
 const QUESTION_MAP = {
@@ -459,20 +461,31 @@ async function loadPendingRequests() {
         }
     }
 }
-
-// Mock email sending function
+// --- REAL EmailJS sending function ---
 async function sendConfirmationEmail(email, name) {
-    const subject = "Consultation Confirmed - SafeMind";
-    const body = `Dear ${name},\n\nYour consultation request has been successfully confirmed and your consultation schedule is now booked.\n\nThank you,\nThe SafeMind Team`;
+    // 1. REPLACE THESE WITH YOUR KEYS FROM EMAILJS DASHBOARD
+    const YOUR_SERVICE_ID = "service_q79gyg4"; // Look in 'Email Services' tab
+    const YOUR_TEMPLATE_ID = "template_o2b1yac";      // From your screenshot
+    const YOUR_PUBLIC_KEY = "jmItGItu0nibZ2mAX";   // Look in 'Account' > 'Public Key'
 
-    console.log(`[MOCK EMAIL SEND]`);
-    console.log(`To: ${email}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Body:\n${body}`);
+    // Initialize (safe to run multiple times)
+    emailjs.init(YOUR_PUBLIC_KEY);
 
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return true;
+    const templateParams = {
+        name: name,   // Matches {{name}} in your template
+        email: email  // Matches {{email}} in your template
+    };
+
+    try {
+        console.log(`[EmailJS] Sending email to ${email}...`);
+        await emailjs.send(YOUR_SERVICE_ID, YOUR_TEMPLATE_ID, templateParams);
+        console.log(`[EmailJS] Email sent successfully!`);
+        return true;
+    } catch (error) {
+        console.error("[EmailJS] Failed to send email:", error);
+        // We return false so we can warn the admin, but we won't stop the database update
+        return false;
+    }
 }
 
 async function confirmRequest(requestId, patientEmail, patientName) {
@@ -485,25 +498,29 @@ async function confirmRequest(requestId, patientEmail, patientName) {
 
         const req = reqSnap.data();
 
-        // Send email first (mock)
+        // 1. Attempt to send the email
         if (patientEmail) {
-            await sendConfirmationEmail(patientEmail, patientName);
-            // Alert user feedback as requested
-            alert("Email Sent");
+            const emailSent = await sendConfirmationEmail(patientEmail, patientName);
+            if (emailSent) {
+                alert("Confirmation Email Sent to Patient.");
+            } else {
+                alert("Warning: The email failed to send, but we will proceed with booking.");
+            }
         } else {
             console.warn("No patient email available, skipping notification.");
         }
 
-        // Add to bookedSlots with explicit strings
+        // 2. Add to bookedSlots
         await addDoc(collection(db, 'bookedSlots'), {
-            date: req.date, // "28/11/2025"
-            time: req.time, // "4:00-6:00"
+            date: req.date, 
+            time: req.time, 
             userId: req.userId || req.userUID || null,
             status: 'confirmed',
             createdAt: serverTimestamp(),
             createdBy: auth.currentUser ? auth.currentUser.uid : null
         });
 
+        // 3. Update the request status
         await updateDoc(reqRef, {
             status: 'confirmed',
             confirmedAt: serverTimestamp(),
