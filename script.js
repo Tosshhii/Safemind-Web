@@ -2,6 +2,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
+import emailjs from 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/+esm';
 
 // Auth imports (Email/Password, Remember Me, Forgot Password)
 import {
@@ -58,6 +59,7 @@ const analytics = getAnalytics(app);
 const db = getFirestore(app); // Initialize Firestore
 // --- END: Firebase Initialization ---
 
+emailjs.init("jmItGItu0nibZ2mAX");
 
 // --- **** NEW QUESTION MAP (FROM YOUR LIST) **** ---
 const QUESTION_MAP = {
@@ -460,22 +462,7 @@ async function loadPendingRequests() {
     }
 }
 
-// Mock email sending function
-async function sendConfirmationEmail(email, name) {
-    const subject = "Consultation Confirmed - SafeMind";
-    const body = `Dear ${name},\n\nYour consultation request has been successfully confirmed and your consultation schedule is now booked.\n\nThank you,\nThe SafeMind Team`;
-
-    console.log(`[MOCK EMAIL SEND]`);
-    console.log(`To: ${email}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Body:\n${body}`);
-
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return true;
-}
-
-async function confirmRequest(requestId, patientEmail, patientName) {
+async function confirmRequest(requestId) {
     if (!confirm('Confirm this consultation and add to calendar?')) return;
     
     try {
@@ -494,16 +481,29 @@ async function confirmRequest(requestId, patientEmail, patientName) {
             console.warn("No patient email available, skipping notification.");
         }
 
-        // Add to bookedSlots with explicit strings
+        // 1. Attempt to send the email
+        if (patientEmail) {
+            const emailSent = await sendConfirmationEmail(patientEmail, patientName);
+            if (emailSent) {
+                alert("Confirmation Email Sent to Patient.");
+            } else {
+                alert("Warning: The email failed to send, but we will proceed with booking.");
+            }
+        } else {
+            console.warn("No patient email available, skipping notification.");
+        }
+
+        // 2. Add to bookedSlots
         await addDoc(collection(db, 'bookedSlots'), {
-            date: req.date, // "28/11/2025"
-            time: req.time, // "4:00-6:00"
+            date: req.date, 
+            time: req.time, 
             userId: req.userId || req.userUID || null,
             status: 'confirmed',
             createdAt: serverTimestamp(),
             createdBy: auth.currentUser ? auth.currentUser.uid : null
         });
 
+        // 3. Update the request status
         await updateDoc(reqRef, {
             status: 'confirmed',
             confirmedAt: serverTimestamp(),
