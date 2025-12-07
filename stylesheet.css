@@ -2043,3 +2043,117 @@ button.sidebar-category::after {
 button.sidebar-category.active::after {
     transform: rotate(180deg);
 }
+
+/* Progress Monitoring Card Styles */
+.progress-header {
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+}
+
+.progress-header h2 {
+    font-size: 1.8em;
+    color: #333;
+}
+
+.progress-status-section {
+    margin-bottom: 20px;
+}
+
+.progress-status-section h3 {
+    font-size: 1.2em;
+    color: #555;
+    margin-bottom: 5px;
+}
+
+.progress-status-section p {
+    font-size: 1.1em;
+    color: #333;
+    font-weight: 500;
+}
+
+.progress-actions {
+    margin-bottom: 30px;
+}
+
+/* Horizontal Bar Chart Styles */
+.progress-chart-container {
+    margin-top: 30px;
+}
+
+.progress-chart-container h3 {
+    font-size: 1.2em;
+    color: #555;
+    margin-bottom: 15px;
+}
+
+.progress-bar-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    border-left: 2px solid #ccc; /* Y-Axis line */
+    padding-left: 10px;
+    position: relative;
+}
+
+/* Axis Labels */
+.progress-bar-chart::after {
+    content: '0% -------------------- 50% -------------------- 100%';
+    display: block;
+    margin-top: 10px;
+    font-size: 0.8em;
+    color: #777;
+    white-space: pre;
+}
+
+.chart-row {
+    display: flex;
+    align-items: center;
+    /* justify-content: flex-start;  <-- Removed to allow text to be next to bar */
+}
+
+.chart-label {
+    width: 150px; /* Fixed width for Y-axis labels */
+    font-size: 0.9em;
+    color: #555;
+    text-align: right;
+    padding-right: 15px;
+    flex-shrink: 0;
+}
+
+.chart-bar-container {
+    flex-grow: 1;
+    background: #f0f0f0;
+    height: 24px;
+    border-radius: 4px;
+    position: relative;
+    max-width: 100%; /* Ensure it fits */
+}
+
+.chart-bar {
+    height: 100%;
+    background-color: #07960e; /* Match theme green */
+    border-radius: 4px;
+    transition: width 0.5s ease-out;
+    position: relative;
+}
+
+.chart-bar-value {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.8em;
+    color: #fff;
+    font-weight: bold;
+    pointer-events: none; /* Let clicks pass through */
+}
+
+/* Ensure text is visible if bar is too small */
+.chart-bar[style*="width: 0"], .chart-bar[style*="width: 1"], .chart-bar[style*="width: 2"], .chart-bar[style*="width: 3"], .chart-bar[style*="width: 4"], .chart-bar[style*="width: 5"], .chart-bar[style*="width: 6"], .chart-bar[style*="width: 7"], .chart-bar[style*="width: 8"], .chart-bar[style*="width: 9"] {
+    overflow: visible;
+}
+.chart-bar[style*="width: 0"] .chart-bar-value, .chart-bar[style*="width: 1"] .chart-bar-value, ... {
+    right: -25px;
+    color: #333;
+}

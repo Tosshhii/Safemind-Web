@@ -111,6 +111,30 @@
             </div>
         </div>
 
+        <!-- Patient Progress Monitoring Card -->
+        <div class="patient-profile-content" style="margin-top: 30px;">
+            <div class="progress-header">
+                <h2>Patient Progress Monitoring</h2>
+            </div>
+
+            <div class="progress-status-section">
+                <h3>Current Status</h3>
+                <p id="progress-summary">Loading...</p>
+            </div>
+
+            <div class="progress-actions">
+                <button id="add-findings-btn" class="btn" style="width: auto; margin-right: 10px;">Add Follow-up Findings</button>
+                <button id="finish-progress-btn" class="btn" style="width: auto; background-color: #666;">Finish Patient Progress</button>
+            </div>
+
+            <div class="progress-chart-container">
+                <h3>Progress History</h3>
+                <div id="progress-chart" class="progress-bar-chart">
+                    <!-- Bars will be injected here -->
+                </div>
+            </div>
+        </div>
+
         <div class="report-scrim"></div>
         <div class="report-modal-wrapper">
             <div class="report-modal-content">
