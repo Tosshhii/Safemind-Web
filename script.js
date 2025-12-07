@@ -364,16 +364,19 @@ async function loadPendingRequests() {
             const req = item.data;
             const patientId = req.userId || req.userUID || null;
             let patientName = req.name || 'Unknown Patient';
+            let patientEmail = '';
 
             if (patientId) {
                 try {
                     const uRef = doc(db, 'users', patientId);
                     const uSnap = await getDoc(uRef);
                     if (uSnap.exists()) {
-                        patientName = uSnap.data().name || patientName;
+                        const userData = uSnap.data();
+                        patientName = userData.name || patientName;
+                        patientEmail = userData.email || '';
                     }
                 } catch (e) {
-                    console.error('Failed to fetch patient name for pending request', e);
+                    console.error('Failed to fetch patient data for pending request', e);
                 }
             }
 
@@ -381,9 +384,10 @@ async function loadPendingRequests() {
             const time = req.time || req.requestTime || '--:--';
 
             // Render as table row or card depending on layout
+            // Added data-patient-email and data-patient-name attributes
             if (useTable) {
                 return `
-                    <tr class="pending-item" data-request-id="${item.id}">
+                    <tr class="pending-item" data-request-id="${item.id}" data-patient-email="${patientEmail}" data-patient-name="${patientName}">
                         <td data-label="Date">${date}</td>
                         <td data-label="Time">${time}</td>
                         <td data-label="Patient"><strong>${patientName}</strong></td>
@@ -395,7 +399,7 @@ async function loadPendingRequests() {
                 `;
             } else {
                 return `
-                    <div class="pending-item" data-request-id="${item.id}">
+                    <div class="pending-item" data-request-id="${item.id}" data-patient-email="${patientEmail}" data-patient-name="${patientName}">
                         <div class="pending-meta"><strong>${patientName}</strong> — ${date} ${time}</div>
                         <div class="pending-actions">
                             <button class="btn confirm-request">Confirm</button>
@@ -413,7 +417,9 @@ async function loadPendingRequests() {
             btn.addEventListener('click', async (e) => {
                 const item = e.target.closest('.pending-item');
                 const requestId = item.getAttribute('data-request-id');
-                await confirmRequest(requestId);
+                const patientEmail = item.getAttribute('data-patient-email');
+                const patientName = item.getAttribute('data-patient-name');
+                await confirmRequest(requestId, patientEmail, patientName);
             });
         });
         
@@ -454,7 +460,22 @@ async function loadPendingRequests() {
     }
 }
 
-async function confirmRequest(requestId) {
+// Mock email sending function
+async function sendConfirmationEmail(email, name) {
+    const subject = "Consultation Confirmed - SafeMind";
+    const body = `Dear ${name},\n\nYour consultation request has been successfully confirmed and your consultation schedule is now booked.\n\nThank you,\nThe SafeMind Team`;
+
+    console.log(`[MOCK EMAIL SEND]`);
+    console.log(`To: ${email}`);
+    console.log(`Subject: ${subject}`);
+    console.log(`Body:\n${body}`);
+
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return true;
+}
+
+async function confirmRequest(requestId, patientEmail, patientName) {
     if (!confirm('Confirm this consultation and add to calendar?')) return;
     
     try {
@@ -463,6 +484,15 @@ async function confirmRequest(requestId) {
         if (!reqSnap.exists()) return alert('Request not found.');
 
         const req = reqSnap.data();
+
+        // Send email first (mock)
+        if (patientEmail) {
+            await sendConfirmationEmail(patientEmail, patientName);
+            // Alert user feedback as requested
+            alert("Email Sent");
+        } else {
+            console.warn("No patient email available, skipping notification.");
+        }
 
         // Add to bookedSlots with explicit strings
         await addDoc(collection(db, 'bookedSlots'), {
@@ -1216,6 +1246,46 @@ function showScrim(show){
     if (!scrim) return;
     if (show) scrim.classList.add('visible'); else scrim.classList.remove('visible');
 }
+
+// --- Helper: Add Progress Bar ---
+function addProgressBar(label, percentage) {
+    const chartContainer = document.getElementById('progress-chart');
+    if (!chartContainer) return;
+
+    const row = document.createElement('div');
+    row.className = 'chart-row';
+
+    // Y-Axis Label
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'chart-label';
+    labelDiv.textContent = label;
+
+    // Bar Container
+    const barContainer = document.createElement('div');
+    barContainer.className = 'chart-bar-container';
+
+    // The Bar itself
+    const bar = document.createElement('div');
+    bar.className = 'chart-bar';
+    bar.style.width = '0%'; // Start at 0 for animation
+
+    // Value text inside/next to bar
+    const valueText = document.createElement('span');
+    valueText.className = 'chart-bar-value';
+    valueText.textContent = `${percentage}%`;
+
+    bar.appendChild(valueText);
+    barContainer.appendChild(bar);
+    row.appendChild(labelDiv);
+    row.appendChild(barContainer);
+
+    chartContainer.appendChild(row);
+
+    // Trigger animation
+    requestAnimationFrame(() => {
+        bar.style.width = `${percentage}%`;
+    });
+}
 // --- End Helper Functions ---
 
 
@@ -1289,6 +1359,12 @@ async function loadPatientProfile() {
     const severityTextElement = document.getElementById('severity-text');
     const descriptionElement = document.querySelector('.severity-description p');
     const needle = document.getElementById('gauge-needle');
+
+    // --- Get Progress elements ---
+    const progressSummary = document.getElementById('progress-summary');
+    const progressChart = document.getElementById('progress-chart');
+    const addFindingsBtn = document.getElementById('add-findings-btn');
+    const finishProgressBtn = document.getElementById('finish-progress-btn');
 
     // --- Get all NEW modal elements ---
     const modalPatientName = document.getElementById('modal-patient-name');
@@ -1381,6 +1457,25 @@ async function loadPatientProfile() {
                 // -90deg is 0%, 90deg is 100%
                 let angle = ((displayPercent / 100) * 180) - 90;
                 needle.style.transform = `rotate(${angle}deg)`;
+            }
+
+            // --- Populate Progress Monitoring Card ---
+            if (progressSummary) {
+                progressSummary.textContent = `${displayPercent}% (${severityText})`;
+            }
+            if (progressChart) {
+                // Clear existing chart (except if we want to persist dynamically added ones locally,
+                // but since we re-fetch on load, let's rebuild it cleanly).
+                // NOTE: The request says "must automatically initialize with existing AI result".
+                // Since we don't have a backend specifically for follow-ups yet, we will start with the AI result.
+                // Any 'new' data added via button is transient in this session unless we store it.
+                // For this task, assuming session-based or simple visual demo is sufficient, or we store in local var.
+                // But the best approach for "Continuity" is to render the base bar here.
+
+                // Check if we already rendered (to avoid duplicates if called multiple times, though loadPatientProfile is usually once)
+                if (!progressChart.hasChildNodes()) {
+                    addProgressBar("AI assessment result", displayPercent);
+                }
             }
 
             // --- Populate modal with analysis data ---
@@ -1544,10 +1639,39 @@ document.addEventListener('DOMContentLoaded', function() {
     const mobileHamburger = document.getElementById('mobile-hamburger');
     const dashboardSidebar = document.querySelector('.dashboard-sidebar');
     if (mobileHamburger && dashboardSidebar) {
-        mobileHamburger.addEventListener('click', function() {
+        mobileHamburger.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent immediate closing due to document click
             dashboardSidebar.classList.toggle('open');
         });
+
+        // Close sidebar when clicking outside
+        document.addEventListener('click', function(e) {
+            if (dashboardSidebar.classList.contains('open')) {
+                // Check if click is outside sidebar and not on the hamburger button
+                if (!dashboardSidebar.contains(e.target) && !mobileHamburger.contains(e.target)) {
+                    dashboardSidebar.classList.remove('open');
+                }
+            }
+        });
      }
+
+    // --- SIDEBAR DROPDOWNS (Consultations, Patient Profiles, User Profiles) ---
+    // Select all buttons that are intended to be dropdown triggers
+    const dropdownTriggers = document.querySelectorAll('button.sidebar-category');
+
+    dropdownTriggers.forEach(trigger => {
+        trigger.addEventListener('click', function() {
+            // Find the next sibling which should be the UL menu
+            const menu = this.nextElementSibling;
+            if (menu && menu.classList.contains('dropdown-menu')) {
+                // Toggle visibility
+                menu.classList.toggle('hidden');
+
+                // Optional: Toggle active state on button for styling (e.g. arrow rotation)
+                this.classList.toggle('active');
+            }
+        });
+    });
 
     // --- NEW: Mobile Nav Toggle (Main Site) ---
     const mainHamburger = document.getElementById('mobile-hamburger-main');
@@ -1657,6 +1781,37 @@ document.addEventListener('DOMContentLoaded', function() {
         pendingSortSelect.addEventListener('change', () => {
             pendingSortMode = pendingSortSelect.value || 'oldest';
             loadPendingRequests();
+        });
+    }
+
+    // --- Progress Card Action Buttons ---
+    const addFindingsBtn = document.getElementById('add-findings-btn');
+    if (addFindingsBtn) {
+        addFindingsBtn.addEventListener('click', () => {
+            const input = prompt("Enter new severity percentage (0-100):");
+            if (input !== null) {
+                const val = parseFloat(input);
+                if (!isNaN(val) && val >= 0 && val <= 100) {
+                    const label = `Follow-up ${document.querySelectorAll('.chart-row').length}`;
+                    addProgressBar(label, Math.round(val));
+
+                    // Update summary too? Maybe
+                    const summary = document.getElementById('progress-summary');
+                    if(summary) summary.textContent = `${Math.round(val)}% (Follow-up)`;
+                } else {
+                    alert("Please enter a valid number between 0 and 100.");
+                }
+            }
+        });
+    }
+
+    const finishProgressBtn = document.getElementById('finish-progress-btn');
+    if (finishProgressBtn) {
+        finishProgressBtn.addEventListener('click', () => {
+            if(confirm("Are you sure you want to finish patient progress monitoring?")) {
+                alert("Patient progress marked as finished.");
+                // Here we would typically update the DB status to 'recovered' or similar
+            }
         });
     }
 

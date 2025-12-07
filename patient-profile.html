@@ -20,7 +20,7 @@
             <div class="user-avatar">
                 <ion-icon name="person-circle"></ion-icon>
             </div>
-            
+
             <div class="profile-dropdown">
                 <div class="profile-info">
                     <ion-icon name="person-circle-outline"></ion-icon>
@@ -45,17 +45,24 @@
         <ul class="sidebar-nav">
             <li class="nav-item hidden"><a href="index.html">Home</a></li>
             <li class="nav-item hidden"><a href="about.html">About Us</a></li>
-            
-            <li><div class="sidebar-category">Consultations</div></li>
-            
-            <li><a href="pending-requests.html" class="sub-link">Pending Requests</a></li>
-            <li><a href="confirmed-consultations.html" class="sub-link">Confirmed Consultations</a></li>
 
-            <li><div class="sidebar-category">User Profiles</div></li>
-            <li><a href="user-profiles-today.html" class="sub-link">Scheduled Today</a></li>
-            <li><a href="user-profiles-finished.html" class="sub-link">Finished Consultations</a></li>
-            <li><a href="user-profiles-future.html" class="sub-link">Future Consultations</a></li>
-            <li><a href="user-profiles-unscheduled.html" class="sub-link">Without Consultations</a></li>
+            <li>
+                <button class="sidebar-category">Consultations</button>
+                <ul class="dropdown-menu hidden">
+                    <li><a href="pending-requests.html" class="sub-link">Pending Requests</a></li>
+                    <li><a href="confirmed-consultations.html" class="sub-link">Confirmed Consultations</a></li>
+                </ul>
+            </li>
+
+            <li>
+                <button class="sidebar-category">User Profiles</button>
+                <ul class="dropdown-menu hidden">
+                    <li><a href="user-profiles-today.html" class="sub-link">Scheduled Today</a></li>
+                    <li><a href="user-profiles-finished.html" class="sub-link">Finished Consultations</a></li>
+                    <li><a href="user-profiles-future.html" class="sub-link">Future Consultations</a></li>
+                    <li><a href="user-profiles-unscheduled.html" class="sub-link">Without Consultations</a></li>
+                </ul>
+            </li>
 
             <li><a href="calendar.html">Calendar</a></li>
         </ul>
@@ -69,28 +76,28 @@
                     Patient's Profile
                 </a>
             </div>
-            
+
             <div class="patient-info">
                 <h2 id="patient-name">Loading...</h2>
                 <p id="patient-age">-- yrs Old</p>
                 <p id="patient-sex">--</p>
                 <p id="patient-location">Loading location...</p>
             </div>
-            
+
             <div class="severity-gauge-container">
                 <div class="gauge-wrapper">
                     <div class="gauge-icon icon-happy">😊</div>
                     <div class="gauge-icon icon-neutral">😐</div>
                     <div class="gauge-icon icon-sad">😢</div>
-                    
+
                     <div class="gauge-arc"></div>
-                    
+
                     <div class="gauge-mask"></div>
-                    
+
                     <div class="gauge-needle" id="gauge-needle"></div>
                     <div class="gauge-pivot"></div>
                 </div>
-                
+
                 <div class="severity-percentage">
                     <span id="severity-value">--%</span>
                 </div>
@@ -98,9 +105,33 @@
                     <p>Based on SafeMind's analysis, the level of severity of the patient's depression is <strong id="severity-text">--%</strong>, which indicates a <strong>...</strong> level of depression.</p>
                 </div>
             </div>
-            
+
             <div class="profile-actions">
                 <a href="#" class="view-report-link">View Full Report</a>
+            </div>
+        </div>
+
+        <!-- Patient Progress Monitoring Card -->
+        <div class="patient-profile-content" style="margin-top: 30px;">
+            <div class="progress-header">
+                <h2>Patient Progress Monitoring</h2>
+            </div>
+
+            <div class="progress-status-section">
+                <h3>Current Status</h3>
+                <p id="progress-summary">Loading...</p>
+            </div>
+
+            <div class="progress-actions">
+                <button id="add-findings-btn" class="btn" style="width: auto; margin-right: 10px;">Add Follow-up Findings</button>
+                <button id="finish-progress-btn" class="btn" style="width: auto; background-color: #666;">Finish Patient Progress</button>
+            </div>
+
+            <div class="progress-chart-container">
+                <h3>Progress History</h3>
+                <div id="progress-chart" class="progress-bar-chart">
+                    <!-- Bars will be injected here -->
+                </div>
             </div>
         </div>
 
@@ -110,23 +141,23 @@
                 <button class="report-modal-close">
                     <ion-icon name="close"></ion-icon>
                 </button>
-                
+
                 <h2 class="report-modal-title">Full Patient Report</h2>
-                
+
                 <div class="report-section report-patient-info">
                     <h3 id="modal-patient-name">Loading...</h3>
                     <p>
-                        <span id="modal-patient-age">--</span> yrs old, 
-                        <span id="modal-patient-sex">--</span> from 
+                        <span id="modal-patient-age">--</span> yrs old,
+                        <span id="modal-patient-sex">--</span> from
                         <span id="modal-patient-location">...</span>
                     </p>
                     <p id="modal-patient-email">...</p>
                 </div>
-                
+
                 <div class="report-section report-severity-info">
                     <h3>Analysis Result</h3>
                     <p>
-                        Severity: <strong id="modal-severity-text">...</strong> 
+                        Severity: <strong id="modal-severity-text">...</strong>
                         (<span id="modal-severity-percent">--%</span>)
                     </p>
                     <div class="report-recommendation">
@@ -134,7 +165,7 @@
                         <p id="modal-recommendation">...</p>
                     </div>
                 </div>
-                
+
                 <div class="report-section report-qa-section">
                     <h3>Patient's Answers</h3>
                     <ul id="modal-qa-container" class="report-qa-list">
