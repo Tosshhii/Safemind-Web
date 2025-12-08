@@ -33,7 +33,7 @@ import {
     getDoc,  
     limit,
     onSnapshot,
-    addDoc, updateDoc, serverTimestamp
+    addDoc, updateDoc, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js"; 
 // --- END FIRESTORE IMPORTS ---
 
@@ -781,7 +781,9 @@ async function loadUserProfilesFiltered(filter) {
             }
 
             // Only include users that match the filter
-            if ((filter === 'scheduled' && !hasScheduledConsultation) || (filter === 'unscheduled' && hasScheduledConsultation)) {
+            if ((filter === 'scheduled' && hasScheduledConsultation) || (filter === 'unscheduled' && !hasScheduledConsultation)) {
+                // This user matches the filter, so include them
+            } else {
                 continue;
             }
 
@@ -1261,10 +1263,42 @@ function renderFullChart(chartContainer, dataArray) {
         const row = document.createElement('div');
         row.className = 'chart-row';
 
-        // Y-Axis Label
+        // Y-Axis Label with Date
         const labelDiv = document.createElement('div');
         labelDiv.className = 'chart-label';
-        labelDiv.textContent = item.label;
+        
+        // Create label text
+        const labelText = document.createElement('div');
+        labelText.className = 'chart-label-text';
+        labelText.textContent = item.label;
+        
+        // Create date text if timestamp exists
+        if (item.timestamp) {
+            const dateText = document.createElement('div');
+            dateText.className = 'chart-label-date';
+            
+            // Convert timestamp to date
+            let dateObj;
+            if (item.timestamp.toDate) {
+                dateObj = item.timestamp.toDate();
+            } else if (item.timestamp instanceof Date) {
+                dateObj = item.timestamp;
+            } else {
+                dateObj = new Date(item.timestamp);
+            }
+            
+            // Format as MM/DD/YYYY
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const year = dateObj.getFullYear();
+            dateText.textContent = `${month}/${day}/${year}`;
+            
+            labelDiv.appendChild(labelText);
+            labelDiv.appendChild(dateText);
+        } else {
+            labelDiv.appendChild(labelText);
+        }
+        
         if (item.notes) {
             labelDiv.title = item.notes; // Tooltip for notes
         }
@@ -1295,6 +1329,18 @@ function renderFullChart(chartContainer, dataArray) {
              bar.style.width = `${percentage}%`;
         }, 50);
     });
+
+    // Add x-axis labels
+    const xAxisLabels = document.createElement('div');
+    xAxisLabels.className = 'x-axis-labels';
+    xAxisLabels.innerHTML = `
+        <span>0%</span>
+        <span>25%</span>
+        <span>50%</span>
+        <span>75%</span>
+        <span>100%</span>
+    `;
+    chartContainer.appendChild(xAxisLabels);
 }
 // --- End Helper Functions ---
 
@@ -1382,6 +1428,8 @@ async function loadPatientProfile() {
     const cancelEntryBtn = document.getElementById('cancel-entry-btn');
     const findingsLog = document.getElementById('findings-log');
     const severityScoreInput = document.getElementById('severity-score');
+    const consultationDate = document.getElementById('consultation-date');
+    const consultationTime = document.getElementById('consultation-time');
 
     // Add loading state to chart
     if (progressChart) {
@@ -1627,6 +1675,113 @@ async function loadPatientProfile() {
             if (severityTextElement) severityTextElement.textContent = 'No analysis';
         }
 
+        // --- Setup Progress Card Event Listeners ---
+        
+        // 1. Show Form
+        if (addFindingsBtn && findingsCard) {
+            addFindingsBtn.addEventListener('click', () => {
+                findingsCard.classList.remove('hidden');
+                // Scroll to form
+                findingsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+        }
+
+        // 2. Hide Form (Cancel)
+        if (cancelEntryBtn && findingsCard) {
+            cancelEntryBtn.addEventListener('click', () => {
+                findingsCard.classList.add('hidden');
+                if (findingsLog) findingsLog.value = '';
+                if (severityScoreInput) severityScoreInput.value = '';
+                if (consultationDate) consultationDate.value = '';
+                if (consultationTime) consultationTime.value = '';
+            });
+        }
+
+        // 3. Save Entry
+        if (saveEntryBtn) {
+            saveEntryBtn.addEventListener('click', async () => {
+                const notes = findingsLog ? findingsLog.value.trim() : '';
+                const scoreStr = severityScoreInput ? severityScoreInput.value : '';
+                const score = parseFloat(scoreStr);
+                const dateValue = consultationDate ? consultationDate.value : '';
+                const timeSlot = consultationTime ? consultationTime.value : '';
+
+                if (isNaN(score) || score < 0 || score > 100) {
+                    alert("Please enter a valid severity score between 0 and 100.");
+                    return;
+                }
+
+                if (!dateValue || !timeSlot) {
+                    alert("Please enter consultation date and time slot.");
+                    return;
+                }
+
+                if (!patientId) {
+                    alert("Error: No patient ID found.");
+                    return;
+                }
+
+                try {
+                    // Convert time slot to 24-hour format for timestamp
+                    const timeSlotMap = {
+                        "8:00-10:00": "08:00",
+                        "10:00-12:00": "10:00",
+                        "2:00-4:00": "14:00",
+                        "4:00-6:00": "16:00"
+                    };
+                    const startTime = timeSlotMap[timeSlot] || "08:00";
+                    const consultationDateTime = new Date(`${dateValue}T${startTime}:00`);
+                    
+                    // Add to followUps collection in the main database
+                    const followUpsRef = collection(db, "followUps");
+                    await addDoc(followUpsRef, {
+                        userId: patientId,
+                        severity: score,
+                        notes: notes,
+                        consultationDate: dateValue,
+                        consultationTimeSlot: timeSlot,
+                        timestamp: Timestamp.fromDate(consultationDateTime),
+                        recordedBy: auth.currentUser ? auth.currentUser.uid : null,
+                        createdAt: serverTimestamp()
+                    });
+
+                    // Also add to user's progress_history subcollection for real-time chart updates
+                    const historyRef = collection(db, "users", patientId, "progress_history");
+                    await addDoc(historyRef, {
+                        severity: score,
+                        notes: notes,
+                        consultationDate: dateValue,
+                        consultationTimeSlot: timeSlot,
+                        timestamp: Timestamp.fromDate(consultationDateTime),
+                        recordedBy: auth.currentUser ? auth.currentUser.uid : null
+                    });
+
+                    alert("Findings recorded successfully!");
+
+                    // Hide and Clear
+                    if (findingsCard) findingsCard.classList.add('hidden');
+                    if (findingsLog) findingsLog.value = '';
+                    if (severityScoreInput) severityScoreInput.value = '';
+                    if (consultationDate) consultationDate.value = '';
+                    if (consultationTime) consultationTime.value = '';
+
+                } catch (error) {
+                    console.error("Error saving findings:", error);
+                    alert("Failed to save findings. See console for details.");
+                }
+            });
+        }
+
+        // 4. Finish Progress
+        if (finishProgressBtn) {
+            finishProgressBtn.addEventListener('click', () => {
+                if(confirm("Are you sure you want to finish patient progress monitoring?")) {
+                    alert("Patient progress marked as finished.");
+                    // Here we would typically update the DB status to 'recovered' or similar
+                }
+            });
+        }
+
     } catch (error) {
         console.error("Error fetching patient data: ", error);
         if (error.code === 'failed-precondition') {
@@ -1845,78 +2000,6 @@ document.addEventListener('DOMContentLoaded', function() {
         pendingSortSelect.addEventListener('change', () => {
             pendingSortMode = pendingSortSelect.value || 'oldest';
             loadPendingRequests();
-        });
-    }
-
-    // --- Progress Card Action Buttons ---
-
-    // 1. Show Form
-    if (addFindingsBtn && findingsCard) {
-        addFindingsBtn.addEventListener('click', () => {
-            findingsCard.classList.remove('hidden');
-            // Scroll to form
-            findingsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        });
-    }
-
-    // 2. Hide Form (Cancel)
-    if (cancelEntryBtn && findingsCard) {
-        cancelEntryBtn.addEventListener('click', () => {
-            findingsCard.classList.add('hidden');
-            if (findingsLog) findingsLog.value = '';
-            if (severityScoreInput) severityScoreInput.value = '';
-        });
-    }
-
-    // 3. Save Entry
-    if (saveEntryBtn) {
-        saveEntryBtn.addEventListener('click', async () => {
-            const notes = findingsLog ? findingsLog.value.trim() : '';
-            const scoreStr = severityScoreInput ? severityScoreInput.value : '';
-            const score = parseFloat(scoreStr);
-
-            if (isNaN(score) || score < 0 || score > 100) {
-                alert("Please enter a valid severity score between 0 and 100.");
-                return;
-            }
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const patientId = urlParams.get('id');
-            if (!patientId) {
-                alert("Error: No patient ID found.");
-                return;
-            }
-
-            try {
-                const historyRef = collection(db, "users", patientId, "progress_history");
-                await addDoc(historyRef, {
-                    severity: score,
-                    notes: notes,
-                    timestamp: serverTimestamp(),
-                    recordedBy: auth.currentUser ? auth.currentUser.uid : null
-                });
-
-                alert("Findings recorded successfully!");
-
-                // Hide and Clear
-                if (findingsCard) findingsCard.classList.add('hidden');
-                if (findingsLog) findingsLog.value = '';
-                if (severityScoreInput) severityScoreInput.value = '';
-
-            } catch (error) {
-                console.error("Error saving findings:", error);
-                alert("Failed to save findings. See console for details.");
-            }
-        });
-    }
-
-    const finishProgressBtn = document.getElementById('finish-progress-btn');
-    if (finishProgressBtn) {
-        finishProgressBtn.addEventListener('click', () => {
-            if(confirm("Are you sure you want to finish patient progress monitoring?")) {
-                alert("Patient progress marked as finished.");
-                // Here we would typically update the DB status to 'recovered' or similar
-            }
         });
     }
 

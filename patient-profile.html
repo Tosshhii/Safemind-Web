@@ -55,16 +55,22 @@
             </li>
 
             <li>
-                <button class="sidebar-category">User Profiles</button>
+                <button class="sidebar-category">Patient Profiles</button>
                 <ul class="dropdown-menu hidden">
                     <li><a href="user-profiles-today.html" class="sub-link">Scheduled Today</a></li>
                     <li><a href="user-profiles-finished.html" class="sub-link">Finished Consultations</a></li>
                     <li><a href="user-profiles-future.html" class="sub-link">Future Consultations</a></li>
+                </ul>
+            </li>
+
+            <li>
+                <button class="sidebar-category">User Profiles</button>
+                <ul class="dropdown-menu hidden">
                     <li><a href="user-profiles-unscheduled.html" class="sub-link">Without Consultations</a></li>
                 </ul>
             </li>
 
-            <li><a href="calendar.html">Calendar</a></li>
+            <li><a href="calendar.html" class="sidebar-category">Calendar</a></li>
         </ul>
     </nav>
 
@@ -130,6 +136,20 @@
             <!-- New Consultation Findings Card (Hidden by default) -->
             <div id="consultation-findings-card" class="consultation-findings-card hidden">
                 <h3>Record Consultation Findings</h3>
+                <div class="input-group">
+                    <label for="consultation-date">Consultation Date:</label>
+                    <input type="date" id="consultation-date" required>
+                </div>
+                <div class="input-group">
+                    <label for="consultation-time">Consultation Time Slot:</label>
+                    <select id="consultation-time" required>
+                        <option value="">Select time slot</option>
+                        <option value="8:00-10:00">8:00 AM - 10:00 AM</option>
+                        <option value="10:00-12:00">10:00 AM - 12:00 PM</option>
+                        <option value="2:00-4:00">2:00 PM - 4:00 PM</option>
+                        <option value="4:00-6:00">4:00 PM - 6:00 PM</option>
+                    </select>
+                </div>
                 <div class="input-group">
                     <label for="findings-log">Findings Log:</label>
                     <textarea id="findings-log" rows="4" placeholder="Enter medical observations here..."></textarea>
