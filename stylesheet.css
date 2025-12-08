@@ -2082,79 +2082,105 @@ button.sidebar-category.active::after {
 }
 
 .progress-chart-container h3 {
-    font-size: 1.2em;
-    color: #555;
-    margin-bottom: 15px;
+    font-size: 1.1em;
+    color: #333;
+    margin-bottom: 20px;
+    font-weight: 500;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
 }
 
 .progress-bar-chart {
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    border-left: 2px solid #ccc; /* Y-Axis line */
-    padding-left: 10px;
+    gap: 8px;
+    padding: 10px 0;
     position: relative;
 }
 
-/* Axis Labels */
+/* X-axis container */
 .progress-bar-chart::after {
-    content: '0% -------------------- 50% -------------------- 100%';
+    content: '';
     display: block;
     margin-top: 10px;
-    font-size: 0.8em;
-    color: #777;
-    white-space: pre;
+    margin-left: 110px;
+    padding-top: 8px;
+    height: 20px;
+}
+
+/* X-axis labels using a wrapper approach */
+.x-axis-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    margin-left: 110px;
+    font-size: 0.7em;
+    color: #999;
 }
 
 .chart-row {
     display: flex;
     align-items: center;
-    /* justify-content: flex-start;  <-- Removed to allow text to be next to bar */
+    gap: 10px;
 }
 
 .chart-label {
-    width: 150px; /* Fixed width for Y-axis labels */
-    font-size: 0.9em;
+    min-width: 100px;
+    max-width: 100px;
+    font-size: 0.85em;
     color: #555;
-    text-align: right;
-    padding-right: 15px;
+    text-align: left;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.chart-label-text {
+    font-weight: 500;
+}
+
+.chart-label-date {
+    font-size: 0.75em;
+    color: #888;
+    font-weight: 400;
 }
 
 .chart-bar-container {
     flex-grow: 1;
     background: #f0f0f0;
-    height: 24px;
-    border-radius: 4px;
+    height: 32px;
+    border-radius: 16px;
     position: relative;
-    max-width: 100%; /* Ensure it fits */
+    overflow: hidden;
 }
 
 .chart-bar {
     height: 100%;
-    background-color: #07960e; /* Match theme green */
-    border-radius: 4px;
-    transition: width 0.5s ease-out;
+    background: #07960e;
+    border-radius: 16px;
+    transition: width 0.8s ease-out;
     position: relative;
 }
 
 .chart-bar-value {
     position: absolute;
-    right: 5px;
+    right: 10px;
     top: 50%;
     transform: translateY(-50%);
-    font-size: 0.8em;
+    font-size: 0.85em;
     color: #fff;
-    font-weight: bold;
-    pointer-events: none; /* Let clicks pass through */
+    font-weight: 600;
+    pointer-events: none;
 }
 
 /* Ensure text is visible if bar is too small */
-.chart-bar[style*="width: 0"], .chart-bar[style*="width: 1"], .chart-bar[style*="width: 2"], .chart-bar[style*="width: 3"], .chart-bar[style*="width: 4"], .chart-bar[style*="width: 5"], .chart-bar[style*="width: 6"], .chart-bar[style*="width: 7"], .chart-bar[style*="width: 8"], .chart-bar[style*="width: 9"] {
+.chart-bar[style*="width: 0"], .chart-bar[style*="width: 1"], .chart-bar[style*="width: 2"], .chart-bar[style*="width: 3"], .chart-bar[style*="width: 4"], .chart-bar[style*="width: 5"], .chart-bar[style*="width: 6"], .chart-bar[style*="width: 7"], .chart-bar[style*="width: 8"], .chart-bar[style*="width: 9"], .chart-bar[style*="width: 10"], .chart-bar[style*="width: 11"], .chart-bar[style*="width: 12"], .chart-bar[style*="width: 13"], .chart-bar[style*="width: 14"], .chart-bar[style*="width: 15"] {
     overflow: visible;
 }
-.chart-bar[style*="width: 0"] .chart-bar-value, .chart-bar[style*="width: 1"] .chart-bar-value, ... {
-    right: -25px;
+.chart-bar[style*="width: 0"] .chart-bar-value, .chart-bar[style*="width: 1"] .chart-bar-value, .chart-bar[style*="width: 2"] .chart-bar-value, .chart-bar[style*="width: 3"] .chart-bar-value, .chart-bar[style*="width: 4"] .chart-bar-value, .chart-bar[style*="width: 5"] .chart-bar-value, .chart-bar[style*="width: 6"] .chart-bar-value, .chart-bar[style*="width: 7"] .chart-bar-value, .chart-bar[style*="width: 8"] .chart-bar-value, .chart-bar[style*="width: 9"] .chart-bar-value, .chart-bar[style*="width: 10"] .chart-bar-value, .chart-bar[style*="width: 11"] .chart-bar-value, .chart-bar[style*="width: 12"] .chart-bar-value, .chart-bar[style*="width: 13"] .chart-bar-value, .chart-bar[style*="width: 14"] .chart-bar-value, .chart-bar[style*="width: 15"] .chart-bar-value {
+    right: auto;
+    left: calc(100% + 8px);
     color: #333;
 }
 
