@@ -1430,6 +1430,7 @@ async function loadPatientProfile() {
     const severityScoreInput = document.getElementById('severity-score');
     const consultationDate = document.getElementById('consultation-date');
     const consultationTime = document.getElementById('consultation-time');
+    const reopenCaseBtn = document.getElementById('reopen-case-btn');
 
     // Add loading state to chart
     if (progressChart) {
@@ -1482,6 +1483,36 @@ async function loadPatientProfile() {
             if (modalPatientSex) modalPatientSex.textContent = userData.sex || "--";
             if (modalPatientLocation) modalPatientLocation.textContent = fullLocation;
             if (modalPatientEmail) modalPatientEmail.textContent = userData.email || "No email provided";
+            
+            // --- Check case status and manage button visibility ---
+            const caseStatus = userData.caseStatus || 'open';
+            if (caseStatus === 'finished') {
+                // Case is finished
+                if (addFindingsBtn) {
+                    addFindingsBtn.disabled = true;
+                    addFindingsBtn.style.opacity = '0.5';
+                    addFindingsBtn.style.cursor = 'not-allowed';
+                }
+                if (finishProgressBtn) {
+                    finishProgressBtn.style.display = 'none';
+                }
+                if (reopenCaseBtn) {
+                    reopenCaseBtn.style.display = 'inline-block';
+                }
+            } else {
+                // Case is open
+                if (addFindingsBtn) {
+                    addFindingsBtn.disabled = false;
+                    addFindingsBtn.style.opacity = '1';
+                    addFindingsBtn.style.cursor = 'pointer';
+                }
+                if (finishProgressBtn) {
+                    finishProgressBtn.style.display = 'inline-block';
+                }
+                if (reopenCaseBtn) {
+                    reopenCaseBtn.style.display = 'none';
+                }
+            }
             
         } else {
             console.log("Patient document not found in 'users' collection");
@@ -1774,10 +1805,66 @@ async function loadPatientProfile() {
 
         // 4. Finish Progress
         if (finishProgressBtn) {
-            finishProgressBtn.addEventListener('click', () => {
+            finishProgressBtn.addEventListener('click', async () => {
                 if(confirm("Are you sure you want to finish patient progress monitoring?")) {
-                    alert("Patient progress marked as finished.");
-                    // Here we would typically update the DB status to 'recovered' or similar
+                    try {
+                        // Update patient document with caseStatus = 'finished'
+                        const userDocRef = doc(db, "users", patientId);
+                        await updateDoc(userDocRef, {
+                            caseStatus: 'finished'
+                        });
+                        
+                        alert("Patient progress marked as finished.");
+                        
+                        // Disable add findings button and show reopen button
+                        if (addFindingsBtn) {
+                            addFindingsBtn.disabled = true;
+                            addFindingsBtn.style.opacity = '0.5';
+                            addFindingsBtn.style.cursor = 'not-allowed';
+                        }
+                        if (finishProgressBtn) {
+                            finishProgressBtn.style.display = 'none';
+                        }
+                        if (reopenCaseBtn) {
+                            reopenCaseBtn.style.display = 'inline-block';
+                        }
+                    } catch (error) {
+                        console.error('Error finishing patient progress:', error);
+                        alert('Failed to finish patient progress. See console for details.');
+                    }
+                }
+            });
+        }
+        
+        // 5. Reopen Case
+        if (reopenCaseBtn) {
+            reopenCaseBtn.addEventListener('click', async () => {
+                if(confirm("Are you sure you want to reopen this patient case?")) {
+                    try {
+                        // Update patient document with caseStatus = 'open'
+                        const userDocRef = doc(db, "users", patientId);
+                        await updateDoc(userDocRef, {
+                            caseStatus: 'open'
+                        });
+                        
+                        alert("Patient case reopened.");
+                        
+                        // Enable add findings button and hide reopen button
+                        if (addFindingsBtn) {
+                            addFindingsBtn.disabled = false;
+                            addFindingsBtn.style.opacity = '1';
+                            addFindingsBtn.style.cursor = 'pointer';
+                        }
+                        if (finishProgressBtn) {
+                            finishProgressBtn.style.display = 'inline-block';
+                        }
+                        if (reopenCaseBtn) {
+                            reopenCaseBtn.style.display = 'none';
+                        }
+                    } catch (error) {
+                        console.error('Error reopening patient case:', error);
+                        alert('Failed to reopen patient case. See console for details.');
+                    }
                 }
             });
         }
