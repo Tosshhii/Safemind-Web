@@ -2082,17 +2082,6 @@ document.addEventListener('DOMContentLoaded', function() {
      });
     // --- END UPDATED ---
 
-    // Header scroll shadow on pages with <header>
-    const siteHeader = document.querySelector('header');
-    if (siteHeader) {
-        const onScroll = () => {
-            if (window.scrollY > 10) siteHeader.classList.add('header-scrolled');
-            else siteHeader.classList.remove('header-scrolled');
-        };
-        onScroll();
-        window.addEventListener('scroll', onScroll, { passive: true });
-    }
-
     // Active nav highlight in main header
     const navEl = document.getElementById('primary-navigation');
     if (navEl) {
