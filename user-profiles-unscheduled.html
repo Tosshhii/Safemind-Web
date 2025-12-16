@@ -18,19 +18,19 @@
             <div class="user-avatar">
                 <ion-icon name="person-circle"></ion-icon>
             </div>
-            <div class="profile-dropdown">
+            <div class="profile-dropdown" role="region" aria-label="User profile menu">
                 <div class="profile-info">
                     <ion-icon name="person-circle-outline"></ion-icon>
                     <span id="user-email-display">loading...</span>
                 </div>
-                <ul class="profile-menu">
-                    <li><a href="#" id="logout-button"><ion-icon name="log-out-outline"></ion-icon>Logout</a></li>
+                <ul class="profile-menu" role="menu">
+                    <li role="none"><a href="#" id="logout-button" role="menuitem"><ion-icon name="log-out-outline"></ion-icon>Logout</a></li>
                 </ul>
             </div>
         </div>
     </header>
 
-    <nav class="dashboard-sidebar">
+    <nav class="dashboard-sidebar" role="navigation" aria-label="Dashboard navigation">
         <div class="sidebar-header">
             <button class="hamburger-menu">
                 <ion-icon name="menu"></ion-icon>
@@ -74,15 +74,18 @@
 
             <div class="table-toolbar">
                 <label for="user-profiles-sort">Sort by:</label>
-                <select id="user-profiles-sort" class="table-sort-select">
+                <select id="user-profiles-sort" class="table-sort-select" aria-label="Sort user profiles">
                     <option value="name">Name (A–Z)</option>
+                    <option value="name-desc">Name (Z–A)</option>
+                    <option value="recent">Most recently scheduled</option>
                     <option value="latest">Latest registered</option>
                 </select>
             </div>
 
-            <div id="user-profiles-grid-unscheduled" class="user-profiles-grid">
-                <!-- Unscheduled user cards will be injected by script.js -->
+            <div id="user-profiles-grid-unscheduled" class="user-profiles-grid" role="region" aria-label="Users without scheduled consultations">
+                <div class="loading-state" role="status" aria-live="polite"><p>Loading...</p></div>
             </div>
+            <!-- Unscheduled user cards will be injected by script.js -->
         </div>
     </main>
 

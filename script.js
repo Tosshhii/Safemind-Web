@@ -193,11 +193,13 @@ function parseDateTime(dateStr, timeStr) {
 // --- END NEW HELPER ---
 
 
-let confirmedSortMode = 'newest'; // 'newest' | 'oldest'
+let confirmedSortMode = 'newest'; // 'newest' | 'oldest' | 'recent'
 
 // --- (UPDATED) Load appointments for Confirmed Consultations Page ---
 async function loadAppointments() {
     const tableBody = document.getElementById('schedule-table-body');
+    const sortSelect = document.getElementById('confirmed-sort');
+    if (sortSelect) sortSelect.disabled = true;
     if (!tableBody) return; // Stop if we're not on the confirmed page
 
     tableBody.innerHTML = '<tr><td colspan="3">Loading confirmed consultations...</td></tr>';
@@ -222,21 +224,27 @@ async function loadAppointments() {
             const data = doc.data();
             // Prefer createdAt timestamp if available, otherwise fall back to date/time fields
             let sortDate;
+            let createdAtTs = 0;
             if (data.createdAt && typeof data.createdAt.toMillis === 'function') {
                 sortDate = new Date(data.createdAt.toMillis());
+                createdAtTs = data.createdAt.toMillis();
             } else {
                 sortDate = parseDateTime(data.date, data.time);
+                createdAtTs = sortDate.getTime();
             }
             return {
                 id: doc.id,
                 ...data,
-                sortDate 
+                sortDate,
+                createdAtTs
             };
         });
 
         // 4. Sort according to current mode
         if (confirmedSortMode === 'oldest') {
             appointments.sort((a, b) => a.sortDate - b.sortDate);
+        } else if (confirmedSortMode === 'recent') {
+            appointments.sort((a, b) => (b.createdAtTs || 0) - (a.createdAtTs || 0));
         } else { // default: newest first
             appointments.sort((a, b) => b.sortDate - a.sortDate);
         }
@@ -289,6 +297,9 @@ async function loadAppointments() {
         } else {
             tableBody.innerHTML = '<tr><td colspan="3">Error loading appointments.</td></tr>';
         }
+    }
+    finally {
+        if (sortSelect) sortSelect.disabled = false;
     }
 }
 // --- END UPDATED FUNCTION ---
@@ -489,8 +500,7 @@ async function confirmRequest(requestId, patientEmail, patientName) {
         // Send email first (mock)
         if (patientEmail) {
             await sendConfirmationEmail(patientEmail, patientName);
-            // Alert user feedback as requested
-            alert("Email Sent");
+            if (typeof showToast === 'function') showToast('Email sent to patient.', 'success');
         } else {
             console.warn("No patient email available, skipping notification.");
         }
@@ -513,10 +523,10 @@ async function confirmRequest(requestId, patientEmail, patientName) {
 
         loadPendingRequests(); // Reload list
 
-        alert('Consultation confirmed and added to calendar.');
+        if (typeof showToast === 'function') showToast('Consultation confirmed and added to calendar.', 'success');
     } catch (error) {
         console.error('Error confirming request', error);
-        alert('Failed to confirm request. See console for details.');
+        if (typeof showToast === 'function') showToast('Failed to confirm request.', 'error');
     }
 }
 
@@ -532,19 +542,21 @@ async function declineRequest(requestId) {
         });
 
         loadPendingRequests();
-        alert('Consultation request declined.');
+        if (typeof showToast === 'function') showToast('Consultation request declined.', 'info');
     } catch (error) {
         console.error('Error declining request', error);
-        alert('Failed to decline request. See console for details.');
+        if (typeof showToast === 'function') showToast('Failed to decline request.', 'error');
     }
 }
 
 // --- End pending-request functions ---
 
 // --- User Profiles (Admin view) ---
-let userProfilesSortMode = 'name'; // 'name' | 'latest'
+let userProfilesSortMode = 'name'; // 'name' | 'name-desc' | 'latest' | 'recent'
 
 async function loadUserProfiles() {
+    const sortSelect = document.getElementById('user-profiles-sort');
+    if (sortSelect) sortSelect.disabled = true;
     const scheduledGrid = document.getElementById('user-profiles-scheduled');
     const unscheduledGrid = document.getElementById('user-profiles-unscheduled');
     if (!scheduledGrid || !unscheduledGrid) return;
@@ -577,6 +589,12 @@ async function loadUserProfiles() {
                 const bTs = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
                 return bTs - aTs;
             });
+        } else if (userProfilesSortMode === 'name-desc') {
+            users.sort((a, b) => {
+                const aName = (a.name || '').toLowerCase();
+                const bName = (b.name || '').toLowerCase();
+                return bName.localeCompare(aName);
+            });
         } else {
             users.sort((a, b) => {
                 const aName = (a.name || '').toLowerCase();
@@ -606,6 +624,7 @@ async function loadUserProfiles() {
             // Fetch the most recently created confirmed consultation for this user
             let scheduledText = 'No confirmed consultations yet';
             let hasScheduledConsultation = false;
+            let latestTs = 0;
             
             try {
                 const bookingsQ = query(
@@ -622,6 +641,11 @@ async function loadUserProfiles() {
                     const bTime = booking.time || '--:--';
                     scheduledText = `Last scheduled: ${bDate} at ${bTime}`;
                     hasScheduledConsultation = true;
+                    if (booking.createdAt && typeof booking.createdAt.toMillis === 'function') {
+                        latestTs = booking.createdAt.toMillis();
+                    } else {
+                        latestTs = parseDateTime(bDate, bTime).getTime();
+                    }
                 }
             } catch (e) {
                 console.error('Error loading latest booking for user', user.id, e);
@@ -650,7 +674,7 @@ async function loadUserProfiles() {
             `;
 
             if (hasScheduledConsultation) {
-                scheduledUsers.push(userCard);
+                scheduledUsers.push({ html: userCard, latestTs });
             } else {
                 unscheduledUsers.push(userCard);
             }
@@ -658,7 +682,11 @@ async function loadUserProfiles() {
 
         // Display scheduled users
         if (scheduledUsers.length > 0) {
-            scheduledGrid.innerHTML = scheduledUsers.join('');
+            let items = scheduledUsers;
+            if (userProfilesSortMode === 'recent') {
+                items = [...scheduledUsers].sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0));
+            }
+            scheduledGrid.innerHTML = items.map(it => it.html).join('');
         } else {
             scheduledGrid.innerHTML = '<p>No users with scheduled consultations.</p>';
         }
@@ -698,10 +726,15 @@ async function loadUserProfiles() {
         scheduledGrid.innerHTML = '<p>Error loading user profiles. Check console for details.</p>';
         unscheduledGrid.innerHTML = '';
     }
+    finally {
+        if (sortSelect) sortSelect.disabled = false;
+    }
 }
 
 // Load only scheduled or unscheduled user profiles into a single grid (used by separate pages)
 async function loadUserProfilesFiltered(filter) {
+    const sortSelect = document.getElementById('user-profiles-sort');
+    if (sortSelect) sortSelect.disabled = true;
     // filter: 'scheduled' | 'unscheduled'
     const scheduledGrid = document.getElementById('user-profiles-grid-scheduled');
     const unscheduledGrid = document.getElementById('user-profiles-grid-unscheduled');
@@ -734,6 +767,12 @@ async function loadUserProfilesFiltered(filter) {
                 const bTs = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
                 return bTs - aTs;
             });
+        } else if (userProfilesSortMode === 'name-desc') {
+            users.sort((a, b) => {
+                const aName = (a.name || '').toLowerCase();
+                const bName = (b.name || '').toLowerCase();
+                return bName.localeCompare(aName);
+            });
         } else {
             users.sort((a, b) => {
                 const aName = (a.name || '').toLowerCase();
@@ -760,6 +799,7 @@ async function loadUserProfilesFiltered(filter) {
             // Check for latest confirmed booking
             let scheduledText = 'No confirmed consultations yet';
             let hasScheduledConsultation = false;
+            let latestTs = 0;
             try {
                 const bookingsQ = query(
                     collection(db, 'bookedSlots'),
@@ -775,6 +815,11 @@ async function loadUserProfilesFiltered(filter) {
                     const bTime = booking.time || '--:--';
                     scheduledText = `Last scheduled: ${bDate} at ${bTime}`;
                     hasScheduledConsultation = true;
+                    if (booking.createdAt && typeof booking.createdAt.toMillis === 'function') {
+                        latestTs = booking.createdAt.toMillis();
+                    } else {
+                        latestTs = parseDateTime(bDate, bTime).getTime();
+                    }
                 }
             } catch (e) {
                 console.error('Error loading latest booking for user', user.id, e);
@@ -809,11 +854,15 @@ async function loadUserProfilesFiltered(filter) {
                 </article>
             `;
 
-            cards.push(userCard);
+            cards.push({ html: userCard, latestTs, hasScheduledConsultation });
         }
 
         if (cards.length > 0) {
-            targetGrid.innerHTML = cards.join('');
+            let items = cards;
+            if (userProfilesSortMode === 'recent' && filter === 'scheduled') {
+                items = [...cards].sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0));
+            }
+            targetGrid.innerHTML = items.map(it => it.html).join('');
         } else {
             targetGrid.innerHTML = '<p>No users found for this filter.</p>';
         }
@@ -821,10 +870,15 @@ async function loadUserProfilesFiltered(filter) {
         console.error('Error loading user profiles (filtered)', error);
         targetGrid.innerHTML = '<p>Error loading user profiles. Check console for details.</p>';
     }
+    finally {
+        if (sortSelect) sortSelect.disabled = false;
+    }
 }
 
 // Load users grouped by consultation date status: 'today', 'finished', or 'future'
 async function loadUserProfilesByConsultationStatus(status) {
+    const sortSelect = document.getElementById('user-profiles-sort');
+    if (sortSelect) sortSelect.disabled = true;
     // status: 'today' | 'finished' | 'future'
     const gridId = {
         'today': 'user-profiles-grid-today',
@@ -850,12 +904,18 @@ async function loadUserProfilesByConsultationStatus(status) {
             return { id: docSnap.id, ...data };
         });
 
-        // Sort by name or latest
+        // Sort by name or latest ("recent" will be applied after building cards)
         if (userProfilesSortMode === 'latest') {
             users.sort((a, b) => {
                 const aTs = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
                 const bTs = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
                 return bTs - aTs;
+            });
+        } else if (userProfilesSortMode === 'name-desc') {
+            users.sort((a, b) => {
+                const aName = (a.name || '').toLowerCase();
+                const bName = (b.name || '').toLowerCase();
+                return bName.localeCompare(aName);
             });
         } else {
             users.sort((a, b) => {
@@ -953,12 +1013,25 @@ async function loadUserProfilesByConsultationStatus(status) {
                     </div>
                 </article>
             `;
+            // Compute latestTs for sorting by "recent"
+            let latestTs = 0;
+            if (latestBooking) {
+                if (latestBooking.createdAt && typeof latestBooking.createdAt.toMillis === 'function') {
+                    latestTs = latestBooking.createdAt.toMillis();
+                } else {
+                    latestTs = parseDateTime(latestBooking.date || '', latestBooking.time || '').getTime();
+                }
+            }
 
-            cards.push(userCard);
+            cards.push({ html: userCard, latestTs });
         }
 
         if (cards.length > 0) {
-            targetGrid.innerHTML = cards.join('');
+            let items = cards;
+            if (userProfilesSortMode === 'recent') {
+                items = [...cards].sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0));
+            }
+            targetGrid.innerHTML = items.map(it => it.html).join('');
         } else {
             const statusLabel = { 'today': 'scheduled today', 'finished': 'with finished consultations', 'future': 'with future consultations' }[status];
             targetGrid.innerHTML = `<p>No users ${statusLabel}.</p>`;
@@ -966,6 +1039,9 @@ async function loadUserProfilesByConsultationStatus(status) {
     } catch (error) {
         console.error('Error loading user profiles by status', error);
         targetGrid.innerHTML = '<p>Error loading user profiles. Check console for details.</p>';
+    }
+    finally {
+        if (sortSelect) sortSelect.disabled = false;
     }
 }
 
@@ -1354,10 +1430,30 @@ if (loginForm) {
         const password = document.getElementById('login-password').value;
         const rememberMeInput = document.querySelector('.form-box.login input[name="remember"]');
         const rememberMe = rememberMeInput ? rememberMeInput.checked : false;
+        const emailErr = document.getElementById('email-error');
+        const passErr = document.getElementById('password-error');
+        if (emailErr) emailErr.textContent = '';
+        if (passErr) passErr.textContent = '';
+
+        // Basic validation
+        let hasError = false;
+        if (!email || !/.+@.+\..+/.test(email)) {
+            if (emailErr) emailErr.textContent = 'Enter a valid email address.';
+            hasError = true;
+        }
+        if (!password) {
+            if (passErr) passErr.textContent = 'Enter your password.';
+            hasError = true;
+        }
+        if (hasError) {
+            if (typeof showToast === 'function') showToast('Please fix the highlighted fields.', 'error');
+            return;
+        }
 
         // --- NEW: Admin-only check ---
         if (email !== 'atchazoj6@gmail.com') {
-            alert('This email address is not authorized for login.');
+            if (emailErr) emailErr.textContent = 'This email is not authorized.';
+            if (typeof showToast === 'function') showToast('Not authorized to access.', 'error');
             return; // Stop the login process
         }
         // --- END: Admin-only check ---
@@ -1381,9 +1477,10 @@ if (loginForm) {
                 console.error("Login error:", error);
                 const errorCode = error.code;
                 if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
-                    alert('Invalid email or password. Please try again.');
+                    if (passErr) passErr.textContent = 'Invalid email or password.';
+                    if (typeof showToast === 'function') showToast('Invalid email or password.', 'error');
                 } else {
-                    alert(error.message);
+                    if (typeof showToast === 'function') showToast(error.message || 'Login failed.', 'error');
                 }
             });
     });
@@ -1787,7 +1884,7 @@ async function loadPatientProfile() {
                         recordedBy: auth.currentUser ? auth.currentUser.uid : null
                     });
 
-                    alert("Findings recorded successfully!");
+                    if (typeof showToast === 'function') showToast('Findings recorded successfully.', 'success');
 
                     // Hide and Clear
                     if (findingsCard) findingsCard.classList.add('hidden');
@@ -1798,7 +1895,7 @@ async function loadPatientProfile() {
 
                 } catch (error) {
                     console.error("Error saving findings:", error);
-                    alert("Failed to save findings. See console for details.");
+                    if (typeof showToast === 'function') showToast('Failed to save findings.', 'error');
                 }
             });
         }
@@ -1814,7 +1911,7 @@ async function loadPatientProfile() {
                             caseStatus: 'finished'
                         });
                         
-                        alert("Patient progress marked as finished.");
+                        if (typeof showToast === 'function') showToast('Patient progress marked as finished.', 'success');
                         
                         // Disable add findings button and show reopen button
                         if (addFindingsBtn) {
@@ -1830,7 +1927,7 @@ async function loadPatientProfile() {
                         }
                     } catch (error) {
                         console.error('Error finishing patient progress:', error);
-                        alert('Failed to finish patient progress. See console for details.');
+                        if (typeof showToast === 'function') showToast('Failed to finish patient progress.', 'error');
                     }
                 }
             });
@@ -1847,7 +1944,7 @@ async function loadPatientProfile() {
                             caseStatus: 'open'
                         });
                         
-                        alert("Patient case reopened.");
+                        if (typeof showToast === 'function') showToast('Patient case reopened.', 'success');
                         
                         // Enable add findings button and hide reopen button
                         if (addFindingsBtn) {
@@ -1863,7 +1960,7 @@ async function loadPatientProfile() {
                         }
                     } catch (error) {
                         console.error('Error reopening patient case:', error);
-                        alert('Failed to reopen patient case. See console for details.');
+                        if (typeof showToast === 'function') showToast('Failed to reopen patient case.', 'error');
                     }
                 }
             });
@@ -1890,8 +1987,48 @@ if (mediaReduceMotion.matches) document.documentElement.classList.add('reduce-mo
 
 // --- DOMContentLoaded listener ---
 document.addEventListener('DOMContentLoaded', function() {
+    // Ensure toast container exists (for non-blocking notifications)
+    (function ensureToastContainer(){
+        const existing = document.querySelector('.toast-container');
+        if (!existing) {
+            const el = document.createElement('div');
+            el.className = 'toast-container';
+            document.body.appendChild(el);
+        }
+    })();
+
+    // Helper: showToast(message, type='info', opts)
+    window.showToast = function(message, type = 'info', opts = {}) {
+        try {
+            const container = document.querySelector('.toast-container');
+            if (!container) return alert(message);
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const title = opts.title ? `<div class="toast-title">${opts.title}</div>` : '';
+            toast.innerHTML = `${title}<div class="toast-message">${message}</div>`;
+            container.appendChild(toast);
+            const duration = opts.duration || 3000;
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(4px)';
+                setTimeout(() => toast.remove(), 260);
+            }, duration);
+        } catch (e) {
+            console.warn('Toast failed, falling back to alert');
+            alert(message);
+        }
+    }
     
     // --- UPDATED: Page specific initializations ---
+    // Restore sort preferences from localStorage (if any)
+    try {
+        const savedConfirmed = localStorage.getItem('confirmedSortMode');
+        if (savedConfirmed) confirmedSortMode = savedConfirmed;
+        const savedPending = localStorage.getItem('pendingSortMode');
+        if (savedPending) pendingSortMode = savedPending;
+        const savedUserSort = localStorage.getItem('userProfilesSortMode');
+        if (savedUserSort) userProfilesSortMode = savedUserSort;
+    } catch (e) { /* ignore storage errors */ }
     // 1. Calendar
     if (document.getElementById('calendar-body')) {
         initializeCalendar();
@@ -1926,6 +2063,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('user-profiles-grid-unscheduled')) {
         loadUserProfilesFiltered('unscheduled');
     }
+    // NEW: Combined User Profiles page (two sections in one page)
+    if (document.getElementById('user-profiles-scheduled') && document.getElementById('user-profiles-unscheduled')) {
+        loadUserProfiles();
+    }
     // --- END UPDATED ---
 
     // --- UPDATED: Calendar navigation ---
@@ -1940,6 +2081,31 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeCalendar(); // Re-fetches and re-renders all
      });
     // --- END UPDATED ---
+
+    // Header scroll shadow on pages with <header>
+    const siteHeader = document.querySelector('header');
+    if (siteHeader) {
+        const onScroll = () => {
+            if (window.scrollY > 10) siteHeader.classList.add('header-scrolled');
+            else siteHeader.classList.remove('header-scrolled');
+        };
+        onScroll();
+        window.addEventListener('scroll', onScroll, { passive: true });
+    }
+
+    // Active nav highlight in main header
+    const navEl = document.getElementById('primary-navigation');
+    if (navEl) {
+        const links = Array.from(navEl.querySelectorAll('a[href]'));
+        const current = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+        links.forEach(a => {
+            const href = (a.getAttribute('href') || '').split('?')[0].split('#')[0].toLowerCase();
+            if (href && current === href) {
+                a.classList.add('active-link');
+                a.setAttribute('aria-current', 'page');
+            }
+        });
+    }
 
     // Mobile sidebar toggle (Dashboard)
     const mobileHamburger = document.getElementById('mobile-hamburger');
@@ -2050,22 +2216,22 @@ document.addEventListener('DOMContentLoaded', function() {
             const email = emailInput ? emailInput.value.trim() : null;
 
             if (!email) {
-                alert('Please enter your email address in the email field first, then click "Forgot Password?".');
+                if (typeof showToast === 'function') showToast('Enter your email first, then click Forgot Password.', 'info');
                 return;
             }
 
             sendPasswordResetEmail(auth, email)
                 .then(() => {
-                    alert('Password reset email sent! Please check your inbox (and spam folder).');
+                    if (typeof showToast === 'function') showToast('Password reset email sent.', 'success');
                       closeOverlays();
                 })
                 .catch((error) => {
                     const errorCode = error.code;
                     console.error("Password Reset Error:", errorCode, error.message);
                     if (errorCode === 'auth/user-not-found' || errorCode === 'auth/invalid-email') {
-                        alert('Could not send reset email. Please ensure the email address is correct and registered.');
+                        if (typeof showToast === 'function') showToast('Email not found or invalid.', 'error');
                     } else {
-                        alert(`Error sending reset email: ${error.message}`);
+                        if (typeof showToast === 'function') showToast('Error sending reset email.', 'error');
                     }
                 });
         });
@@ -2074,30 +2240,42 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Sort controls for tables ---
     const confirmedSortSelect = document.getElementById('confirmed-sort');
     if (confirmedSortSelect) {
+        // Set select to saved value if available
+        if (confirmedSortMode) confirmedSortSelect.value = confirmedSortMode;
         confirmedSortMode = confirmedSortSelect.value || 'newest';
         confirmedSortSelect.addEventListener('change', () => {
             confirmedSortMode = confirmedSortSelect.value || 'newest';
+            try { localStorage.setItem('confirmedSortMode', confirmedSortMode); } catch (e) {}
+            confirmedSortSelect.disabled = true;
             loadAppointments();
+            setTimeout(() => { confirmedSortSelect.disabled = false; }, 600);
         });
     }
 
     const pendingSortSelect = document.getElementById('pending-sort');
     if (pendingSortSelect) {
+        if (pendingSortMode) pendingSortSelect.value = pendingSortMode;
         pendingSortMode = pendingSortSelect.value || 'oldest';
         pendingSortSelect.addEventListener('change', () => {
             pendingSortMode = pendingSortSelect.value || 'oldest';
+            try { localStorage.setItem('pendingSortMode', pendingSortMode); } catch (e) {}
+            pendingSortSelect.disabled = true;
             loadPendingRequests();
+            setTimeout(() => { pendingSortSelect.disabled = false; }, 600);
         });
     }
 
     const userProfilesSortSelect = document.getElementById('user-profiles-sort');
     if (userProfilesSortSelect) {
+        if (userProfilesSortMode) userProfilesSortSelect.value = userProfilesSortMode;
         userProfilesSortMode = userProfilesSortSelect.value || 'name';
         userProfilesSortSelect.addEventListener('change', () => {
             userProfilesSortMode = userProfilesSortSelect.value || 'name';
+            try { localStorage.setItem('userProfilesSortMode', userProfilesSortMode); } catch (e) {}
+            userProfilesSortSelect.disabled = true;
             
             // Determine which loader to call based on which grid exists
-            if (document.getElementById('user-profiles-grid')) {
+            if (document.getElementById('user-profiles-scheduled') && document.getElementById('user-profiles-unscheduled')) {
                 loadUserProfiles();
             } else if (document.getElementById('user-profiles-grid-today')) {
                 loadUserProfilesByConsultationStatus('today');
@@ -2105,9 +2283,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 loadUserProfilesByConsultationStatus('finished');
             } else if (document.getElementById('user-profiles-grid-future')) {
                 loadUserProfilesByConsultationStatus('future');
+            } else if (document.getElementById('user-profiles-grid-scheduled')) {
+                loadUserProfilesFiltered('scheduled');
             } else if (document.getElementById('user-profiles-grid-unscheduled')) {
                 loadUserProfilesFiltered('unscheduled');
             }
+
+            setTimeout(() => { userProfilesSortSelect.disabled = false; }, 600);
         });
     }
 

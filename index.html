@@ -13,7 +13,7 @@
     <header>
         <img src="images/logo.png" alt="SafeMind Logo" class="logo">
         
-        <button class_regular="hamburger-menu mobile-only" id="mobile-hamburger-main" aria-label="Toggle navigation" aria-expanded="false">
+        <button class="hamburger-menu mobile-only" id="mobile-hamburger-main" aria-label="Toggle navigation" aria-expanded="false" aria-controls="primary-navigation">
             <ion-icon name="menu"></ion-icon>
         </button>
 
@@ -40,32 +40,33 @@
 
         <div class="form-box login">
             <h2>Login</h2>
-            <form action="#" autocomplete="on">
+            <form action="#" autocomplete="on" id="login-form" novalidate>
                 <div class="input-box">
                     <span class="icon">
                         <ion-icon name="mail"></ion-icon>
                     </span>
-                    <input type="email" id="login-email" name="email" autocomplete="email" required placeholder=" ">
+                    <input type="email" id="login-email" name="email" autocomplete="email" required placeholder=" " aria-required="true" aria-describedby="email-error">
                     <label for="login-email">Email</label>
+                    <span id="email-error" class="error-message" role="alert" aria-live="polite"></span>
                 </div>
                 <div class="input-box">
                     <span class="icon">
                         <ion-icon name="lock-closed"></ion-icon>
                     </span>
-                    <input type="password" id="login-password" name="password" autocomplete="current-password" required placeholder=" ">
+                    <input type="password" id="login-password" name="password" autocomplete="current-password" required placeholder=" " aria-required="true" aria-describedby="password-error">
                     <label for="login-password">Password</label>
+                    <span id="password-error" class="error-message" role="alert" aria-live="polite"></span>
                 </div>
                 <div class="remember-forgot">
-                    <label><input type="checkbox" name="remember">Remember me</label>
-                    <a href="#">Forgot Password?</a>
+                    <label><input type="checkbox" name="remember" id="remember-me">Remember me</label>
+                    <a href="#" id="forgot-password-link">Forgot Password?</a>
                 </div>
-                <button type="submit" class="btn">Login</button>
+                <button type="submit" class="btn" id="login-btn">Login</button>
                 <div class="login-register">
                     <p>Administrator access only.</p>
                 </div>
+                <div class="form-status" id="form-status" role="status" aria-live="polite" aria-atomic="true"></div>
             </form>
-        </div>
-
         </div>
 
     <script type="module" src="script.js" defer></script>

@@ -74,8 +74,10 @@
 
             <div class="table-toolbar">
                 <label for="user-profiles-sort">Sort by:</label>
-                <select id="user-profiles-sort" class="table-sort-select">
+                <select id="user-profiles-sort" class="table-sort-select" aria-label="Sort user profiles">
                     <option value="name">Name (A–Z)</option>
+                    <option value="name-desc">Name (Z–A)</option>
+                    <option value="recent">Most recently scheduled</option>
                     <option value="latest">Latest registered</option>
                 </select>
             </div>
