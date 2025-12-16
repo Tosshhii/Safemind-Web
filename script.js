@@ -1786,6 +1786,40 @@ async function loadPatientProfile() {
             if (nameElement) nameElement.textContent = "Patient Not Found";
         }
 
+        // --- CHECK IF USER HAS CONFIRMED CONSULTATIONS ---
+        let hasConfirmedConsultation = false;
+        try {
+            const bookingsQ = query(
+                collection(db, 'bookedSlots'),
+                where('userId', '==', patientId),
+                where('status', '==', 'confirmed'),
+                limit(1)
+            );
+            const bookingSnap = await getDocs(bookingsQ);
+            hasConfirmedConsultation = !bookingSnap.empty;
+        } catch (e) {
+            console.error('Error checking consultations:', e);
+        }
+
+        // Gray out progress monitoring if no confirmed consultations
+        const progressMonitoringSection = document.querySelector('.patient-profile-content:has(#progress-summary)');
+        if (!hasConfirmedConsultation && progressMonitoringSection) {
+            progressMonitoringSection.style.opacity = '0.5';
+            progressMonitoringSection.style.pointerEvents = 'none';
+            progressMonitoringSection.style.filter = 'grayscale(100%)';
+            
+            // Add a message
+            const progressHeader = progressMonitoringSection.querySelector('.progress-header');
+            if (progressHeader) {
+                const noConsultMsg = document.createElement('p');
+                noConsultMsg.style.color = '#e74c3c';
+                noConsultMsg.style.fontSize = '0.9em';
+                noConsultMsg.style.marginTop = '10px';
+                noConsultMsg.textContent = '⚠ This patient has no confirmed consultations scheduled.';
+                progressHeader.appendChild(noConsultMsg);
+            }
+        }
+
         // --- FETCH 2: Get Latest Prediction from 'api_predictions' ---
         const predictionsRef = collectionGroup(db, "api_predictions");
         const q = query(
