@@ -125,7 +125,12 @@
 
             <div class="progress-status-section">
                 <h3>Current Status</h3>
-                <p id="progress-summary">Loading...</p>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <p id="progress-summary" style="margin: 0;">Loading...</p>
+                    <span id="urgency-badge" class="urgency-badge" style="display: none;"></span>
+                    <span id="trend-indicator" class="trend-indicator" style="margin-left: auto; font-weight: bold; color: #666;"></span>
+                </div>
+                <div id="comparison-metrics" class="comparison-metrics" style="margin-top: 10px; font-size: 0.9em; color: #666;"></div>
             </div>
 
             <div class="progress-actions">
@@ -158,6 +163,9 @@
                 <div class="input-group">
                     <label for="severity-score">Current Severity Score (0-100%):</label>
                     <input type="number" id="severity-score" min="0" max="100" placeholder="e.g. 65">
+                    <div class="severity-guide">
+                        <small><strong>Guide:</strong> 0-33: Mild | 34-66: Moderate | 67-100: Severe</small>
+                    </div>
                 </div>
                 <div class="form-actions">
                     <button id="save-entry-btn" class="btn" style="width: auto; margin-right: 10px;">Save Entry</button>
@@ -167,6 +175,7 @@
 
             <div class="progress-chart-container">
                 <h3>Progress History</h3>
+                <div id="chart-tooltip" class="chart-tooltip" style="display: none; position: absolute; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 4px; font-size: 0.9em; z-index: 1000;"></div>
                 <div id="progress-chart" class="progress-bar-chart">
                     <!-- Bars will be injected here -->
                 </div>

@@ -1333,11 +1333,13 @@ function renderFullChart(chartContainer, dataArray) {
     // Clear existing
     chartContainer.innerHTML = '';
 
-    dataArray.forEach(item => {
+    dataArray.forEach((item, index) => {
         const percentage = Math.round(item.score);
 
         const row = document.createElement('div');
         row.className = 'chart-row';
+        row.dataset.index = index;
+        row.dataset.notes = item.notes || '';
 
         // Y-Axis Label with Date
         const labelDiv = document.createElement('div');
@@ -1387,6 +1389,19 @@ function renderFullChart(chartContainer, dataArray) {
         const bar = document.createElement('div');
         bar.className = 'chart-bar';
         bar.style.width = '0%'; // Start at 0 for animation
+        
+        // Color logic based on severity change from baseline
+        if (index > 0) {
+            const baselineScore = dataArray[0].score;
+            const scoreDiff = item.score - baselineScore;
+            
+            if (scoreDiff >= 15) {
+                bar.style.background = '#e74c3c'; // Red for 15+ increase
+            } else if (scoreDiff >= 5) {
+                bar.style.background = '#f39c12'; // Orange for 5-14 increase
+            }
+            // Otherwise keeps default green color from CSS
+        }
 
         // Value text inside/next to bar
         const valueText = document.createElement('span');
@@ -1399,6 +1414,29 @@ function renderFullChart(chartContainer, dataArray) {
         row.appendChild(barContainer);
 
         chartContainer.appendChild(row);
+
+        // Add interactivity: hover tooltip and click to expand
+        row.addEventListener('mouseenter', (e) => {
+            const tooltip = document.getElementById('chart-tooltip');
+            if (tooltip && item.notes) {
+                tooltip.textContent = `${item.label} - ${percentage}%\n\n${item.notes}`;
+                tooltip.style.display = 'block';
+                const rect = row.getBoundingClientRect();
+                tooltip.style.left = (rect.right + 10) + 'px';
+                tooltip.style.top = rect.top + 'px';
+            }
+        });
+
+        row.addEventListener('mouseleave', () => {
+            const tooltip = document.getElementById('chart-tooltip');
+            if (tooltip) tooltip.style.display = 'none';
+        });
+
+        row.addEventListener('click', () => {
+            if (item.notes) {
+                alert(`${item.label}\nScore: ${percentage}%\n\nNotes:\n${item.notes}`);
+            }
+        });
 
         // Trigger animation with forced reflow
         setTimeout(() => {
@@ -1417,7 +1455,136 @@ function renderFullChart(chartContainer, dataArray) {
         <span>100%</span>
     `;
     chartContainer.appendChild(xAxisLabels);
+
 }
+
+// --- New Helper Function: Calculate Trend and Metrics ---
+function updateProgressMetrics(dataArray) {
+    if (!dataArray || dataArray.length < 2) return;
+
+    const initialScore = dataArray[0].score;
+    const latestScore = dataArray[dataArray.length - 1].score;
+    const scoreDiff = latestScore - initialScore;
+    const percentChange = initialScore !== 0 ? ((scoreDiff / initialScore) * 100).toFixed(1) : 0;
+
+    // Calculate trend (improving vs worsening)
+    let trend = '';
+    let trendClass = '';
+    if (scoreDiff < -5) {
+        trend = '↓ Improving';
+        trendClass = 'trend-down';
+    } else if (scoreDiff > 5) {
+        trend = '↑ Worsening';
+        trendClass = 'trend-up';
+    } else {
+        trend = '→ Stable';
+        trendClass = 'trend-stable';
+    }
+
+    // Update trend indicator
+    const trendIndicator = document.getElementById('trend-indicator');
+    if (trendIndicator) {
+        trendIndicator.textContent = trend;
+        trendIndicator.className = 'trend-indicator ' + trendClass;
+    }
+
+    // Calculate urgency flags
+    const urgencyBadge = document.getElementById('urgency-badge');
+    const lastEntry = dataArray[dataArray.length - 1];
+    let urgencyFlag = '';
+    let urgencyClass = '';
+
+    // Check if worsened significantly
+    if (scoreDiff > 20) {
+        urgencyFlag = '⚠ Critical: Significant Worsening';
+        urgencyClass = 'critical';
+    } else if (scoreDiff > 10) {
+        urgencyFlag = '⚠ Warning: Worsening Trend';
+        urgencyClass = 'warning';
+    }
+
+    // Check if no recent follow-up (older than 7 days)
+    if (lastEntry && lastEntry.timestamp) {
+        let entryDate;
+        if (lastEntry.timestamp.toDate) {
+            entryDate = lastEntry.timestamp.toDate();
+        } else if (lastEntry.timestamp instanceof Date) {
+            entryDate = lastEntry.timestamp;
+        } else {
+            entryDate = new Date(lastEntry.timestamp);
+        }
+        const daysSinceLastEntry = Math.floor((Date.now() - entryDate) / (1000 * 60 * 60 * 24));
+        if (daysSinceLastEntry > 7 && !urgencyFlag) {
+            urgencyFlag = `⚠ Follow-up Due: ${daysSinceLastEntry} days since last entry`;
+            urgencyClass = 'warning';
+        }
+    }
+
+    if (urgencyBadge) {
+        if (urgencyFlag) {
+            urgencyBadge.textContent = urgencyFlag;
+            urgencyBadge.className = `urgency-badge ${urgencyClass}`;
+            urgencyBadge.style.display = 'inline-block';
+        } else {
+            urgencyBadge.style.display = 'none';
+        }
+    }
+
+    // Display comparison metrics
+    const metricsDiv = document.getElementById('comparison-metrics');
+    if (metricsDiv) {
+        metricsDiv.innerHTML = `
+            <div class="metric-item">Baseline: <strong>${initialScore}%</strong></div>
+            <div class="metric-item">Current: <strong>${latestScore}%</strong></div>
+            <div class="metric-item">Change: <strong>${scoreDiff > 0 ? '+' : ''}${scoreDiff.toFixed(1)}%</strong> (${percentChange}%)</div>
+            <div class="metric-item">Total Entries: <strong>${dataArray.length}</strong></div>
+        `;
+    }
+}
+
+// --- Helper Function: Export Patient Data ---
+function exportPatientData(patientName, patientData, dataArray) {
+    const timestamp = new Date().toLocaleString();
+    const csvData = [
+        `Patient: ${patientName}`,
+        `Export Date: ${timestamp}`,
+        '',
+        'Progress History',
+        'Entry,Score (%),Date,Notes'
+    ];
+
+    dataArray.forEach((item, index) => {
+        let dateStr = '';
+        if (item.timestamp) {
+            let dateObj;
+            if (item.timestamp.toDate) {
+                dateObj = item.timestamp.toDate();
+            } else if (item.timestamp instanceof Date) {
+                dateObj = item.timestamp;
+            } else {
+                dateObj = new Date(item.timestamp);
+            }
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const year = dateObj.getFullYear();
+            dateStr = `${month}/${day}/${year}`;
+        }
+        const notes = (item.notes || '').replace(/"/g, '""').replace(/\n/g, ' ');
+        csvData.push(`${item.label},${item.score}%,${dateStr},"${notes}"`);
+    });
+
+    const csvContent = csvData.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${patientName.replace(/\s+/g, '_')}_progress_${new Date().getTime()}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    if (typeof showToast === 'function') showToast('Patient data exported successfully.', 'success');
+}
+
 // --- End Helper Functions ---
 
 
@@ -1555,9 +1722,12 @@ async function loadPatientProfile() {
         // --- FETCH 1: Get User Info from 'users' collection ---
         const userDocRef = doc(db, "users", patientId);
         const userDocSnap = await getDoc(userDocRef);
+        
+        // Declare userData at function scope so it's accessible in callbacks
+        let userData = null;
 
         if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
+            userData = userDocSnap.data();
             
             // Build full location string
             const locationParts = [];
@@ -1712,6 +1882,9 @@ async function loadPatientProfile() {
                             progressSummary.textContent = `${latest.score}% (${latest.label})`;
                         }
                     }
+
+                    // Calculate and display metrics
+                    updateProgressMetrics(combinedData);
                 }, (error) => {
                     console.error("Error listening to progress history:", error);
                 });
@@ -2120,7 +2293,27 @@ document.addEventListener('DOMContentLoaded', function() {
     // Select all buttons that are intended to be dropdown triggers
     const dropdownTriggers = document.querySelectorAll('button.sidebar-category');
 
+    // Detect current page and expand parent category
+    const currentPage = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+    
     dropdownTriggers.forEach(trigger => {
+        const menu = trigger.nextElementSibling;
+        
+        // Check if any sub-link matches current page
+        if (menu && menu.classList.contains('dropdown-menu')) {
+            const subLinks = menu.querySelectorAll('a[href]');
+            const isActive = Array.from(subLinks).some(link => {
+                const href = (link.getAttribute('href') || '').split('?')[0].toLowerCase();
+                return href && currentPage === href;
+            });
+            
+            // Keep expanded if current page is in this category
+            if (isActive) {
+                menu.classList.remove('hidden');
+                trigger.classList.add('active');
+            }
+        }
+        
         trigger.addEventListener('click', function() {
             // Find the next sibling which should be the UL menu
             const menu = this.nextElementSibling;

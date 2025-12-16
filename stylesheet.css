@@ -2186,6 +2186,100 @@ button.sidebar-category.active::after {
     color: #333;
 }
 
+.chart-row {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.chart-row:hover {
+    opacity: 0.8;
+}
+
+.chart-row.filtered-out {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.urgency-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+    color: white;
+}
+
+.urgency-badge.critical {
+    background-color: #e74c3c;
+}
+
+.urgency-badge.warning {
+    background-color: #f39c12;
+}
+
+.trend-indicator {
+    font-size: 1.1em;
+}
+
+.trend-up {
+    color: #e74c3c;
+}
+
+.trend-down {
+    color: #27ae60;
+}
+
+.trend-stable {
+    color: #95a5a6;
+}
+
+.comparison-metrics {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.metric-item {
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid #3498db;
+}
+
+.severity-guide {
+    margin-top: 8px;
+    padding: 10px;
+    background: #ecf0f1;
+    border-radius: 4px;
+    color: #555;
+}
+
+.notes-filter-input {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 0.9em;
+}
+
+.notes-filter-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 4px rgba(52, 152, 219, 0.3);
+}
+
+.chart-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    z-index: 1000;
+    max-width: 250px;
+    word-wrap: break-word;
+    pointer-events: none;
+}
+
 /* Consultation Findings Card Styles */
 .consultation-findings-card {
     background: #f9f9f9;
