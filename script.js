@@ -33,7 +33,7 @@ import {
     getDoc,  
     limit,
     onSnapshot,
-    addDoc, updateDoc, serverTimestamp, Timestamp
+    addDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js"; 
 // --- END FIRESTORE IMPORTS ---
 
@@ -58,6 +58,16 @@ const auth = getAuth(app);
 const analytics = getAnalytics(app);
 const db = getFirestore(app); // Initialize Firestore
 // --- END: Firebase Initialization ---
+
+// --- Service Worker Registration (site-wide caching) ---
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .catch((error) => {
+                console.warn('Service Worker registration failed:', error);
+            });
+    });
+}
 
 
 // --- **** NEW QUESTION MAP (FROM YOUR LIST) **** ---
@@ -544,6 +554,49 @@ async function declineRequest(requestId) {
 // --- User Profiles (Admin view) ---
 let userProfilesSortMode = 'name'; // 'name' | 'latest'
 
+function buildUserProfileCard({
+    userId,
+    name,
+    age,
+    sex,
+    email,
+    location,
+    scheduledText,
+    statusType = 'scheduled',
+    statusLabel
+}) {
+    const resolvedLabel = statusLabel || ({
+        scheduled: 'With Schedule',
+        unscheduled: 'No Schedule',
+        today: 'Scheduled Today',
+        future: 'Upcoming',
+        finished: 'Finished'
+    }[statusType] || 'Status');
+
+    return `
+        <article class="user-card user-card--${statusType}">
+            <div class="user-card-image user-card-image--${statusType}">
+                <span class="user-card-status user-card-status--${statusType}">${escapeHtml(resolvedLabel)}</span>
+            </div>
+            <div class="user-card-content">
+                <a href="patient-profile.html?id=${encodeURIComponent(userId)}" class="user-card-title-link">
+                    <span class="user-card-title">${escapeHtml(name)}</span>
+                </a>
+                <p class="user-card-desc">
+                    <span class="user-card-desc-line"><strong>Consultation Status:</strong> ${escapeHtml(scheduledText)}</span>
+                    <span class="user-card-desc-line"><strong>Age/Sex:</strong> ${escapeHtml(age)} • ${escapeHtml(sex)}</span>
+                    <span class="user-card-desc-line"><strong>Location:</strong> ${escapeHtml(location)}</span>
+                    <span class="user-card-desc-line"><strong>Email:</strong> ${escapeHtml(email)}</span>
+                </p>
+                <a href="patient-profile.html?id=${encodeURIComponent(userId)}" class="user-card-action">
+                    View Profile &amp; Report
+                    <span aria-hidden="true">→</span>
+                </a>
+            </div>
+        </article>
+    `;
+}
+
 async function loadUserProfiles() {
     const scheduledGrid = document.getElementById('user-profiles-scheduled');
     const unscheduledGrid = document.getElementById('user-profiles-unscheduled');
@@ -591,7 +644,7 @@ async function loadUserProfiles() {
         // Process each user
         for (const user of users) {
             const name = user.name || 'Unknown';
-            const age = user.age ? `${user.age} yrs Old` : '-- yrs Old';
+            const age = user.age ? `${user.age} yrs Old` : 'Age not set';
             const sex = user.sex || '--';
             const email = user.email || 'No email';
             const city = user.city || '--';
@@ -627,27 +680,16 @@ async function loadUserProfiles() {
                 console.error('Error loading latest booking for user', user.id, e);
             }
 
-            const userCard = `
-                <article class="user-card">
-                    <header class="user-card-header">
-                        <h2>${name}</h2>
-                        <p class="user-card-meta">
-                            <span>${age}</span> • <span>${sex}</span>
-                        </p>
-                        <p class="user-card-location">${location}</p>
-                        <p class="user-card-email">${email}</p>
-                    </header>
-                    <div class="user-card-actions">
-                        <div class="user-card-name"><strong>${name}</strong></div>
-                        <div class="user-card-schedule">${scheduledText}</div>
-                    </div>
-                    <div class="user-card-button-wrapper">
-                        <a href="patient-profile.html?id=${encodeURIComponent(user.id)}" class="btn user-card-btn">
-                            View Profile &amp; Report
-                        </a>
-                    </div>
-                </article>
-            `;
+            const userCard = buildUserProfileCard({
+                userId: user.id,
+                name,
+                age,
+                sex,
+                email,
+                location,
+                scheduledText,
+                statusType: hasScheduledConsultation ? 'scheduled' : 'unscheduled'
+            });
 
             if (hasScheduledConsultation) {
                 scheduledUsers.push(userCard);
@@ -746,7 +788,7 @@ async function loadUserProfilesFiltered(filter) {
 
         for (const user of users) {
             const name = user.name || 'Unknown';
-            const age = user.age ? `${user.age} yrs Old` : '-- yrs Old';
+            const age = user.age ? `${user.age} yrs Old` : 'Age not set';
             const sex = user.sex || '--';
             const email = user.email || 'No email';
             const city = user.city || '--';
@@ -787,27 +829,16 @@ async function loadUserProfilesFiltered(filter) {
                 continue;
             }
 
-            const userCard = `
-                <article class="user-card">
-                    <header class="user-card-header">
-                        <h2>${name}</h2>
-                        <p class="user-card-meta">
-                            <span>${age}</span> • <span>${sex}</span>
-                        </p>
-                        <p class="user-card-location">${location}</p>
-                        <p class="user-card-email">${email}</p>
-                    </header>
-                    <div class="user-card-actions">
-                        <div class="user-card-name"><strong>${name}</strong></div>
-                        <div class="user-card-schedule">${scheduledText}</div>
-                    </div>
-                    <div class="user-card-button-wrapper">
-                        <a href="patient-profile.html?id=${encodeURIComponent(user.id)}" class="btn user-card-btn">
-                            View Profile &amp; Report
-                        </a>
-                    </div>
-                </article>
-            `;
+            const userCard = buildUserProfileCard({
+                userId: user.id,
+                name,
+                age,
+                sex,
+                email,
+                location,
+                scheduledText,
+                statusType: hasScheduledConsultation ? 'scheduled' : 'unscheduled'
+            });
 
             cards.push(userCard);
         }
@@ -873,7 +904,7 @@ async function loadUserProfilesByConsultationStatus(status) {
 
         for (const user of users) {
             const name = user.name || 'Unknown';
-            const age = user.age ? `${user.age} yrs Old` : '-- yrs Old';
+            const age = user.age ? `${user.age} yrs Old` : 'Age not set';
             const sex = user.sex || '--';
             const email = user.email || 'No email';
             const city = user.city || '--';
@@ -932,27 +963,21 @@ async function loadUserProfilesByConsultationStatus(status) {
 
             const scheduledText = `Scheduled: ${latestBooking.date} at ${latestBooking.time || '--:--'}`;
 
-            const userCard = `
-                <article class="user-card">
-                    <header class="user-card-header">
-                        <h2>${name}</h2>
-                        <p class="user-card-meta">
-                            <span>${age}</span> • <span>${sex}</span>
-                        </p>
-                        <p class="user-card-location">${location}</p>
-                        <p class="user-card-email">${email}</p>
-                    </header>
-                    <div class="user-card-actions">
-                        <div class="user-card-name"><strong>${name}</strong></div>
-                        <div class="user-card-schedule">${scheduledText}</div>
-                    </div>
-                    <div class="user-card-button-wrapper">
-                        <a href="patient-profile.html?id=${encodeURIComponent(user.id)}" class="btn user-card-btn">
-                            View Profile &amp; Report
-                        </a>
-                    </div>
-                </article>
-            `;
+            const statusTypeByPage = {
+                today: 'today',
+                finished: 'finished',
+                future: 'future'
+            };
+            const userCard = buildUserProfileCard({
+                userId: user.id,
+                name,
+                age,
+                sex,
+                email,
+                location,
+                scheduledText,
+                statusType: statusTypeByPage[status] || 'scheduled'
+            });
 
             cards.push(userCard);
         }
@@ -1250,97 +1275,247 @@ function showScrim(show){
     if (show) scrim.classList.add('visible'); else scrim.classList.remove('visible');
 }
 
-// --- Helper: Render Full Chart ---
-function renderFullChart(chartContainer, dataArray) {
-    if (!chartContainer) return;
+// --- Helpers: Swipeable Progress Cards ---
+function toJsDate(value) {
+    if (!value) return null;
+    if (value.toDate) return value.toDate();
+    if (value instanceof Date) return value;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
-    // Clear existing
-    chartContainer.innerHTML = '';
+function formatDisplayDate(value) {
+    const date = toJsDate(value);
+    if (!date) return '—';
+    return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    });
+}
 
-    dataArray.forEach(item => {
-        const percentage = Math.round(item.score);
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
-        const row = document.createElement('div');
-        row.className = 'chart-row';
+function parsePredictionQa(predictionData) {
+    const inputData = predictionData.input_data || {};
+    let finalRatings = [];
+    let finalTexts = [];
 
-        // Y-Axis Label with Date
-        const labelDiv = document.createElement('div');
-        labelDiv.className = 'chart-label';
-        
-        // Create label text
-        const labelText = document.createElement('div');
-        labelText.className = 'chart-label-text';
-        labelText.textContent = item.label;
-        
-        // Create date text if timestamp exists
-        if (item.timestamp) {
-            const dateText = document.createElement('div');
-            dateText.className = 'chart-label-date';
-            
-            // Convert timestamp to date
-            let dateObj;
-            if (item.timestamp.toDate) {
-                dateObj = item.timestamp.toDate();
-            } else if (item.timestamp instanceof Date) {
-                dateObj = item.timestamp;
-            } else {
-                dateObj = new Date(item.timestamp);
+    if (predictionData.ratings && Array.isArray(predictionData.ratings)) {
+        finalRatings = predictionData.ratings;
+        finalTexts = predictionData.texts || [];
+    } else if (inputData.answers && Array.isArray(inputData.answers)) {
+        finalRatings = inputData.answers;
+        finalTexts = inputData.texts || [];
+    } else {
+        for (let i = 1; i <= 10; i++) {
+            if (inputData[`rating_${i}`]) {
+                finalRatings.push(inputData[`rating_${i}`]);
+                finalTexts.push(inputData[`text_${i}`] || "");
             }
-            
-            // Format as MM/DD/YYYY
-            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const day = String(dateObj.getDate()).padStart(2, '0');
-            const year = dateObj.getFullYear();
-            dateText.textContent = `${month}/${day}/${year}`;
-            
-            labelDiv.appendChild(labelText);
-            labelDiv.appendChild(dateText);
-        } else {
-            labelDiv.appendChild(labelText);
         }
-        
-        if (item.notes) {
-            labelDiv.title = item.notes; // Tooltip for notes
-        }
+    }
 
-        // Bar Container
-        const barContainer = document.createElement('div');
-        barContainer.className = 'chart-bar-container';
-
-        // The Bar itself
-        const bar = document.createElement('div');
-        bar.className = 'chart-bar';
-        bar.style.width = '0%'; // Start at 0 for animation
-
-        // Value text inside/next to bar
-        const valueText = document.createElement('span');
-        valueText.className = 'chart-bar-value';
-        valueText.textContent = `${percentage}%`;
-
-        bar.appendChild(valueText);
-        barContainer.appendChild(bar);
-        row.appendChild(labelDiv);
-        row.appendChild(barContainer);
-
-        chartContainer.appendChild(row);
-
-        // Trigger animation with forced reflow
-        setTimeout(() => {
-             bar.style.width = `${percentage}%`;
-        }, 50);
+    const ratings = finalRatings.map((rating, index) => {
+        const qNum = index + 1;
+        const questionKey = `rating_${qNum}`;
+        const questionLabel = QUESTION_MAP[questionKey] || `Question ${qNum}`;
+        return {
+            qNum,
+            questionLabel,
+            rating
+        };
     });
 
-    // Add x-axis labels
-    const xAxisLabels = document.createElement('div');
-    xAxisLabels.className = 'x-axis-labels';
-    xAxisLabels.innerHTML = `
-        <span>0%</span>
-        <span>25%</span>
-        <span>50%</span>
-        <span>75%</span>
-        <span>100%</span>
+    const sentences = finalTexts
+        .map((text, index) => {
+            const qNum = index + 1;
+            const textKey = `text_${qNum}`;
+            const textLabel = QUESTION_MAP[textKey] || `Context ${qNum}`;
+            return {
+                qNum,
+                textLabel,
+                text: text || ''
+            };
+        })
+        .filter((entry) => entry.text.trim() !== '');
+
+    return { ratings, sentences };
+}
+
+function buildProgressFullReportHtml(fullReport) {
+    const ratingItems = (fullReport.qa?.ratings || []).map((entry) => `
+        <li>
+            <strong>Q${entry.qNum}:</strong> ${escapeHtml(entry.questionLabel)}
+            <div>Rating: <span class="highlight">${escapeHtml(entry.rating)} / 5</span></div>
+        </li>
+    `).join('');
+
+    const sentenceItems = (fullReport.qa?.sentences || []).map((entry) => `
+        <li>
+            <strong>${escapeHtml(entry.textLabel)}</strong>
+            <div>"${escapeHtml(entry.text)}"</div>
+        </li>
+    `).join('');
+
+    return `
+        <div class="progress-report-section">
+            <h5>Patient</h5>
+            <p>${escapeHtml(fullReport.name)} • ${escapeHtml(fullReport.age)} • ${escapeHtml(fullReport.sex)}</p>
+            <p>${escapeHtml(fullReport.location)}</p>
+            <p>${escapeHtml(fullReport.email)}</p>
+        </div>
+        <div class="progress-report-section">
+            <h5>Analysis Result</h5>
+            <p>Severity: <strong>${escapeHtml(fullReport.severityText)}</strong> (${escapeHtml(String(fullReport.severityPercent))}%)</p>
+            <p>${escapeHtml(fullReport.recommendation || 'No recommendation provided.')}</p>
+        </div>
+        <div class="progress-report-section">
+            <h5>Rating Questions & Answers</h5>
+            <ul class="progress-report-list">
+                ${ratingItems || '<li>No rating answers found.</li>'}
+            </ul>
+        </div>
+        <div class="progress-report-section">
+            <h5>Sentence Questions & Answers</h5>
+            <ul class="progress-report-list">
+                ${sentenceItems || '<li>No sentence answers found.</li>'}
+            </ul>
+        </div>
     `;
-    chartContainer.appendChild(xAxisLabels);
+}
+
+function renderProgressCards(cardsTrack, cardsData, handlers = {}) {
+    const { onEditFollowUp, onDeleteFollowUp } = handlers;
+    if (!cardsTrack) return;
+
+    cardsTrack.innerHTML = '';
+
+    if (!Array.isArray(cardsData) || cardsData.length === 0) {
+        cardsTrack.innerHTML = '<p class="progress-card-empty">No reports available yet.</p>';
+        return;
+    }
+
+    cardsData.forEach((item, index) => {
+        const card = document.createElement('article');
+        card.className = 'progress-card';
+        card.dataset.cardIndex = String(index);
+        const cardType = item.type || (index === 0 ? 'initial' : 'followup');
+
+        const severityValue = Number(item.score);
+        const scoreText = Number.isFinite(severityValue) ? `${Math.round(severityValue)}%` : '—';
+        const descriptionText = item.notes || item.summary || 'No notes available.';
+        const canExpandFullReport = cardType === 'initial' && item.fullReport;
+        const followUpActionsSection = cardType === 'followup' && item.id
+            ? `
+                <div class="progress-card-admin-actions">
+                    <button type="button" class="progress-card-admin-btn progress-card-admin-btn--edit" data-action="edit-followup">Edit</button>
+                    <button type="button" class="progress-card-admin-btn progress-card-admin-btn--delete" data-action="delete-followup">Delete</button>
+                </div>
+            `
+            : '';
+
+        const fullReportSection = canExpandFullReport
+            ? `
+                <div class="progress-card-expand-hint">Click card to ${item.expanded ? 'collapse' : 'expand'} full report</div>
+                <div class="progress-card-full-report hidden">
+                    ${buildProgressFullReportHtml(item.fullReport)}
+                </div>
+            `
+            : '';
+
+        card.innerHTML = `
+            <div class="progress-card-image progress-card-image--${escapeHtml(cardType)}">
+                <span class="progress-card-status progress-card-status--${escapeHtml(cardType)}">${escapeHtml(item.label || `Report ${index + 1}`)}</span>
+            </div>
+            <div class="progress-card-content">
+                <span class="progress-card-title">${escapeHtml(item.label || `Report ${index + 1}`)}</span>
+                <p class="progress-card-desc">
+                    <span class="progress-card-desc-line"><strong>Date:</strong> ${escapeHtml(item.consultationDate || formatDisplayDate(item.timestamp))}</span>
+                    <span class="progress-card-desc-line"><strong>Time:</strong> ${escapeHtml(item.consultationTimeSlot || 'Initial AI Assessment')}</span>
+                    <span class="progress-card-desc-line"><strong>Notes:</strong> ${escapeHtml(descriptionText)}</span>
+                </p>
+                <div class="progress-card-action" role="note" aria-label="severity">
+                    Severity: ${escapeHtml(scoreText)}
+                    <span aria-hidden="true">→</span>
+                </div>
+                ${followUpActionsSection}
+                ${fullReportSection}
+            </div>
+        `;
+
+        if (canExpandFullReport) {
+            card.classList.add('progress-card-clickable');
+            card.setAttribute('role', 'button');
+            card.setAttribute('tabindex', '0');
+            const toggleExpanded = () => {
+                const details = card.querySelector('.progress-card-full-report');
+                if (!details) return;
+                details.classList.toggle('hidden');
+                card.classList.toggle('progress-card-expanded');
+            };
+            card.addEventListener('click', toggleExpanded);
+            card.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    toggleExpanded();
+                }
+            });
+        }
+
+        if (cardType === 'followup' && item.id) {
+            const editBtn = card.querySelector('[data-action="edit-followup"]');
+            const deleteBtn = card.querySelector('[data-action="delete-followup"]');
+
+            if (editBtn && typeof onEditFollowUp === 'function') {
+                editBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onEditFollowUp(item);
+                });
+            }
+
+            if (deleteBtn && typeof onDeleteFollowUp === 'function') {
+                deleteBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onDeleteFollowUp(item);
+                });
+            }
+        }
+
+        cardsTrack.appendChild(card);
+    });
+}
+
+function updateFocusedCard(cardsScroll, cardsTrack) {
+    if (!cardsScroll || !cardsTrack) return;
+    const cards = cardsTrack.querySelectorAll('.progress-card');
+    if (cards.length === 0) return;
+
+    const centerX = cardsScroll.scrollLeft + (cardsScroll.clientWidth / 2);
+    let nearestCard = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    cards.forEach((card) => {
+        const cardCenter = card.offsetLeft + (card.offsetWidth / 2);
+        const distance = Math.abs(cardCenter - centerX);
+        if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestCard = card;
+        }
+    });
+
+    cards.forEach((card) => card.classList.remove('progress-card-focus'));
+    if (nearestCard) nearestCard.classList.add('progress-card-focus');
 }
 // --- End Helper Functions ---
 
@@ -1418,7 +1593,8 @@ async function loadPatientProfile() {
 
     // --- Get Progress elements ---
     const progressSummary = document.getElementById('progress-summary');
-    const progressChart = document.getElementById('progress-chart');
+    const progressCardsScroll = document.getElementById('progress-cards-scroll');
+    const progressCardsTrack = document.getElementById('progress-cards-track');
     const addFindingsBtn = document.getElementById('add-findings-btn');
     const finishProgressBtn = document.getElementById('finish-progress-btn');
 
@@ -1427,14 +1603,14 @@ async function loadPatientProfile() {
     const saveEntryBtn = document.getElementById('save-entry-btn');
     const cancelEntryBtn = document.getElementById('cancel-entry-btn');
     const findingsLog = document.getElementById('findings-log');
-    const severityScoreInput = document.getElementById('severity-score');
     const consultationDate = document.getElementById('consultation-date');
     const consultationTime = document.getElementById('consultation-time');
     const reopenCaseBtn = document.getElementById('reopen-case-btn');
+    let latestSeverityScore = 0;
 
-    // Add loading state to chart
-    if (progressChart) {
-        progressChart.innerHTML = '<p style="padding: 10px; color: #666;">Loading progress history...</p>';
+    // Add loading state to cards
+    if (progressCardsTrack) {
+        progressCardsTrack.innerHTML = '<p style="padding: 10px; color: #666;">Loading reports...</p>';
     }
 
     // --- Get all NEW modal elements ---
@@ -1446,13 +1622,23 @@ async function loadPatientProfile() {
     const modalSeverityText = document.getElementById('modal-severity-text');
     const modalSeverityPercent = document.getElementById('modal-severity-percent');
     const modalRecommendation = document.getElementById('modal-recommendation');
-    const qaContainer = document.getElementById('modal-qa-container');
+    const modalRatingQaContainer = document.getElementById('modal-rating-qa-container');
+    const modalSentenceQaContainer = document.getElementById('modal-sentence-qa-container');
+    const legacyQaContainer = document.getElementById('modal-qa-container');
     // --- End modal elements ---
 
     if (!patientId) {
         if (nameElement) nameElement.textContent = "No Patient ID Provided";
         return;
     }
+
+    let patientReportSnapshot = {
+        name: 'Unknown Patient',
+        age: 'Age not set',
+        sex: '--',
+        location: 'Unknown Location',
+        email: 'No email provided'
+    };
 
     try {
         // --- FETCH 1: Get User Info from 'users' collection ---
@@ -1473,7 +1659,7 @@ async function loadPatientProfile() {
             // Populate main page
             const sexElement = document.getElementById('patient-sex');
             if (nameElement) nameElement.textContent = userData.name || "Unknown Patient";
-            if (ageElement) ageElement.textContent = userData.age ? `${userData.age} yrs Old` : '-- yrs Old';
+            if (ageElement) ageElement.textContent = userData.age ? `${userData.age} yrs Old` : 'Age not set';
             if (sexElement) sexElement.textContent = userData.sex || '--';
             if (locationElement) locationElement.textContent = fullLocation;
 
@@ -1483,6 +1669,14 @@ async function loadPatientProfile() {
             if (modalPatientSex) modalPatientSex.textContent = userData.sex || "--";
             if (modalPatientLocation) modalPatientLocation.textContent = fullLocation;
             if (modalPatientEmail) modalPatientEmail.textContent = userData.email || "No email provided";
+
+            patientReportSnapshot = {
+                name: userData.name || 'Unknown Patient',
+                age: userData.age ? `${userData.age} yrs Old` : 'Age not set',
+                sex: userData.sex || '--',
+                location: fullLocation,
+                email: userData.email || 'No email provided'
+            };
             
             // --- Check case status and manage button visibility ---
             const caseStatus = userData.caseStatus || 'open';
@@ -1547,6 +1741,8 @@ async function loadPatientProfile() {
 
             const displayPercent = Math.round(calculatedPercent);
             const severityText = predictionData.severity || 'unknown';
+            const parsedQa = parsePredictionQa(predictionData);
+            latestSeverityScore = displayPercent;
             
             // --- Populate main page ---
             if (severityElement) severityElement.textContent = displayPercent + '%';
@@ -1565,61 +1761,151 @@ async function loadPatientProfile() {
                 progressSummary.textContent = `${displayPercent}% (${severityText})`;
             }
 
-            // --- DYNAMIC CHART LOGIC ---
-            // We now have the base AI score (displayPercent).
-            // We need to subscribe to the patient's progress_history subcollection.
-            if (progressChart) {
-                // Clear chart initially
-                progressChart.innerHTML = '';
+            // --- DYNAMIC SWIPE-CARD LOGIC ---
+            // First card is the initial AI analysis; follow-ups are subsequent cards.
+            if (progressCardsTrack) {
+                progressCardsTrack.innerHTML = '';
 
-                // 1. Add the initial AI Assessment bar immediately
-                // This ensures the "AI assessment result" is always index 0.
-                const initialDataPoint = {
-                    label: "AI Assessment Result",
-                    score: displayPercent,
-                    timestamp: predictionData.timestamp || serverTimestamp() // Fallback
+                const onEditFollowUp = async (followUpItem) => {
+                    const existingNotes = followUpItem.notes || '';
+                    const existingDate = followUpItem.consultationDate || '';
+                    const existingTimeSlot = followUpItem.consultationTimeSlot || '8:00-10:00';
+                    const validTimeSlots = ["8:00-10:00", "10:00-12:00", "2:00-4:00", "4:00-6:00"];
+
+                    const updatedNotes = prompt('Edit findings notes:', existingNotes);
+                    if (updatedNotes === null) return;
+
+                    const updatedDate = prompt('Edit consultation date (YYYY-MM-DD):', existingDate);
+                    if (updatedDate === null) return;
+                    if (!/^\d{4}-\d{2}-\d{2}$/.test(updatedDate)) {
+                        alert('Invalid date format. Please use YYYY-MM-DD.');
+                        return;
+                    }
+
+                    const updatedTimeSlot = prompt(
+                        'Edit consultation time slot:\n8:00-10:00 | 10:00-12:00 | 2:00-4:00 | 4:00-6:00',
+                        existingTimeSlot
+                    );
+                    if (updatedTimeSlot === null) return;
+                    if (!validTimeSlots.includes(updatedTimeSlot)) {
+                        alert('Invalid time slot. Use one of: 8:00-10:00, 10:00-12:00, 2:00-4:00, 4:00-6:00');
+                        return;
+                    }
+
+                    try {
+                        const timeSlotMap = {
+                            "8:00-10:00": "08:00",
+                            "10:00-12:00": "10:00",
+                            "2:00-4:00": "14:00",
+                            "4:00-6:00": "16:00"
+                        };
+                        const startTime = timeSlotMap[updatedTimeSlot] || '08:00';
+                        const consultationDateTime = new Date(`${updatedDate}T${startTime}:00`);
+
+                        const historyDocRef = doc(db, 'users', patientId, 'progress_history', followUpItem.id);
+                        await updateDoc(historyDocRef, {
+                            notes: updatedNotes.trim(),
+                            consultationDate: updatedDate,
+                            consultationTimeSlot: updatedTimeSlot,
+                            timestamp: Timestamp.fromDate(consultationDateTime)
+                        });
+
+                        alert('Follow-up updated successfully.');
+                    } catch (error) {
+                        console.error('Error updating follow-up:', error);
+                        alert('Failed to update follow-up. See console for details.');
+                    }
                 };
 
-                // Store in a local variable to combine with realtime updates
+                const onDeleteFollowUp = async (followUpItem) => {
+                    const confirmed = confirm('Are you sure you want to delete this follow-up entry?');
+                    if (!confirmed) return;
+
+                    try {
+                        const historyDocRef = doc(db, 'users', patientId, 'progress_history', followUpItem.id);
+                        await deleteDoc(historyDocRef);
+                        alert('Follow-up deleted successfully.');
+                    } catch (error) {
+                        console.error('Error deleting follow-up:', error);
+                        alert('Failed to delete follow-up. See console for details.');
+                    }
+                };
+
+                const initialDataPoint = {
+                    label: "AI Analysis #1",
+                    score: displayPercent,
+                    type: 'initial',
+                    timestamp: predictionData.timestamp || new Date(),
+                    consultationDate: formatDisplayDate(predictionData.timestamp || new Date()),
+                    consultationTimeSlot: "Initial AI Assessment",
+                    notes: predictionData.recommendation || "Initial AI analysis from SafeMind.",
+                    summary: `Severity classification: ${severityText}`,
+                    fullReport: {
+                        ...patientReportSnapshot,
+                        severityText,
+                        severityPercent: displayPercent,
+                        recommendation: predictionData.recommendation || "No recommendation provided.",
+                        qa: parsedQa
+                    }
+                };
+
                 let allProgressData = [initialDataPoint];
+                renderProgressCards(progressCardsTrack, allProgressData, {
+                    onEditFollowUp,
+                    onDeleteFollowUp
+                });
+                if (progressCardsScroll) {
+                    updateFocusedCard(progressCardsScroll, progressCardsTrack);
+                }
 
-                // Render initial state
-                renderFullChart(progressChart, allProgressData);
-
-                // 2. Set up Realtime Listener for History
                 const historyRef = collection(db, "users", patientId, "progress_history");
                 const qHistory = query(historyRef, orderBy("timestamp", "asc"));
 
                 onSnapshot(qHistory, (snapshot) => {
-                    const historyData = snapshot.docs.map((doc, index) => {
-                        const d = doc.data();
+                    const historyData = snapshot.docs.map((historyDoc, index) => {
+                        const d = historyDoc.data();
+                        const numericSeverity = Number(d.severity);
+                        const resolvedSeverity = Number.isFinite(numericSeverity) ? numericSeverity : latestSeverityScore;
+                        latestSeverityScore = resolvedSeverity;
                         return {
-                            label: `Follow-up ${index + 1}`,
-                            score: d.severity,
+                            id: historyDoc.id,
+                            label: `Follow-up #${index + 1}`,
+                            score: resolvedSeverity,
+                            type: 'followup',
                             timestamp: d.timestamp,
-                            notes: d.notes
+                            notes: d.notes,
+                            consultationDate: d.consultationDate,
+                            consultationTimeSlot: d.consultationTimeSlot
                         };
                     });
 
-                    // Combine AI result + History
-                    // (AI result is always first)
                     const combinedData = [initialDataPoint, ...historyData];
+                    renderProgressCards(progressCardsTrack, combinedData, {
+                        onEditFollowUp,
+                        onDeleteFollowUp
+                    });
 
-                    // Re-render chart with new data
-                    renderFullChart(progressChart, combinedData);
+                    if (progressCardsScroll) {
+                        updateFocusedCard(progressCardsScroll, progressCardsTrack);
+                    }
 
-                    // Update summary to latest status
                     if (combinedData.length > 0) {
                         const latest = combinedData[combinedData.length - 1];
                         if (progressSummary) {
-                            progressSummary.textContent = `${latest.score}% (${latest.label})`;
+                            progressSummary.textContent = `${Math.round(Number(latest.score) || 0)}% (${latest.label})`;
                         }
                     }
                 }, (error) => {
                     console.error("Error listening to progress history:", error);
                 });
+
+                if (progressCardsScroll) {
+                    progressCardsScroll.addEventListener('scroll', () => {
+                        updateFocusedCard(progressCardsScroll, progressCardsTrack);
+                    }, { passive: true });
+                }
             }
-            // --- END DYNAMIC CHART LOGIC ---
+            // --- END DYNAMIC SWIPE-CARD LOGIC ---
 
             // --- Populate modal with analysis data ---
             if (modalSeverityText) modalSeverityText.textContent = severityText;
@@ -1628,72 +1914,51 @@ async function loadPatientProfile() {
 
             
             // --- **** NEW ROBUST Q&A LOGIC (Universal Adapter) **** ---
-            if (qaContainer) {
-                qaContainer.innerHTML = ''; // Clear old data
+            if (modalRatingQaContainer || modalSentenceQaContainer || legacyQaContainer) {
+                if (modalRatingQaContainer) modalRatingQaContainer.innerHTML = '';
+                if (modalSentenceQaContainer) modalSentenceQaContainer.innerHTML = '';
+                if (legacyQaContainer) legacyQaContainer.innerHTML = '';
 
-                let finalRatings = [];
-                let finalTexts = [];
-                const inputData = predictionData.input_data || {};
-
-                // SOURCE A: Top-Level Arrays (New AI Backend)
-                if (predictionData.ratings && Array.isArray(predictionData.ratings)) {
-                    finalRatings = predictionData.ratings;
-                    finalTexts = predictionData.texts || [];
-                }
-                // SOURCE B: Mobile App Input (Nested 'answers' array)
-                else if (inputData.answers && Array.isArray(inputData.answers)) {
-                    finalRatings = inputData.answers;
-                    finalTexts = inputData.texts || [];
-                }
-                // SOURCE C: Web App Input (Key-Value pairs 'rating_1', etc.)
-                else {
-                    for (let i = 1; i <= 10; i++) {
-                        if (inputData[`rating_${i}`]) {
-                            finalRatings.push(inputData[`rating_${i}`]);
-                            finalTexts.push(inputData[`text_${i}`] || "");
-                        }
-                    }
-                }
-
-                // 2. Render the Data
-                if (finalRatings.length > 0) {
-                    finalRatings.forEach((rating, index) => {
-                        // Map index (0-9) to Question Key (rating_1..10)
-                        const qNum = index + 1;
-                        const questionKey = `rating_${qNum}`;
-                        const questionLabel = QUESTION_MAP[questionKey] || `Question ${qNum}`;
-                        
-                        // Create List Item
-                        const item = document.createElement('li');
-                        item.className = 'qa-item';
-                        item.innerHTML = `
-                            <strong>Q${qNum}: ${questionLabel}</strong>
-                            <p class="rating-answer">Rating: <span class="highlight">${rating} / 5</span></p>
+                if (parsedQa.ratings.length > 0) {
+                    parsedQa.ratings.forEach((entry) => {
+                        const ratingItem = document.createElement('li');
+                        ratingItem.className = 'qa-item';
+                        ratingItem.innerHTML = `
+                            <strong>Q${entry.qNum}: ${entry.questionLabel}</strong>
+                            <p class="rating-answer">Rating: <span class="highlight">${entry.rating} / 5</span></p>
                         `;
-                        qaContainer.appendChild(item);
-
-                        // Append Text Context if it exists
-                        if (finalTexts[index] && finalTexts[index].trim() !== "") {
-                            const textItem = document.createElement('div');
-                            textItem.className = 'qa-text-context';
-                            textItem.style.marginTop = "5px";
-                            textItem.style.marginBottom = "15px";
-                            textItem.style.paddingLeft = "15px";
-                            textItem.style.borderLeft = "3px solid #eee";
-                            textItem.style.color = "#555";
-                            
-                            const textKey = `text_${qNum}`;
-                            const textLabel = QUESTION_MAP[textKey] || "Context";
-                            
-                            textItem.innerHTML = `
-                                <small><em>${textLabel}</em></small><br>
-                                "${finalTexts[index]}"
-                            `;
-                            qaContainer.appendChild(textItem);
+                        if (modalRatingQaContainer) {
+                            modalRatingQaContainer.appendChild(ratingItem);
+                        }
+                        if (legacyQaContainer) {
+                            legacyQaContainer.appendChild(ratingItem.cloneNode(true));
                         }
                     });
-                } else {
-                    qaContainer.innerHTML = '<li>No Q&A data found for this report.</li>';
+                } else if (modalRatingQaContainer) {
+                    modalRatingQaContainer.innerHTML = '<li class="qa-empty">No rating answers found for this report.</li>';
+                }
+
+                if (parsedQa.sentences.length > 0) {
+                    parsedQa.sentences.forEach((entry) => {
+                        const textItem = document.createElement('li');
+                        textItem.className = 'qa-item qa-text-context';
+                        textItem.innerHTML = `
+                            <strong>${entry.textLabel}</strong>
+                            <p>"${entry.text}"</p>
+                        `;
+                        if (modalSentenceQaContainer) {
+                            modalSentenceQaContainer.appendChild(textItem);
+                        }
+                        if (legacyQaContainer) {
+                            legacyQaContainer.appendChild(textItem.cloneNode(true));
+                        }
+                    });
+                } else if (modalSentenceQaContainer) {
+                    modalSentenceQaContainer.innerHTML = '<li class="qa-empty">No sentence answers found for this report.</li>';
+                }
+
+                if (legacyQaContainer && legacyQaContainer.children.length === 0) {
+                    legacyQaContainer.innerHTML = '<li class="qa-empty">No Q&A data found for this report.</li>';
                 }
             }
             // --- **** END OF NEW ROBUST LOGIC **** ---
@@ -1722,7 +1987,6 @@ async function loadPatientProfile() {
             cancelEntryBtn.addEventListener('click', () => {
                 findingsCard.classList.add('hidden');
                 if (findingsLog) findingsLog.value = '';
-                if (severityScoreInput) severityScoreInput.value = '';
                 if (consultationDate) consultationDate.value = '';
                 if (consultationTime) consultationTime.value = '';
             });
@@ -1732,15 +1996,9 @@ async function loadPatientProfile() {
         if (saveEntryBtn) {
             saveEntryBtn.addEventListener('click', async () => {
                 const notes = findingsLog ? findingsLog.value.trim() : '';
-                const scoreStr = severityScoreInput ? severityScoreInput.value : '';
-                const score = parseFloat(scoreStr);
+                const score = Number.isFinite(latestSeverityScore) ? latestSeverityScore : 0;
                 const dateValue = consultationDate ? consultationDate.value : '';
                 const timeSlot = consultationTime ? consultationTime.value : '';
-
-                if (isNaN(score) || score < 0 || score > 100) {
-                    alert("Please enter a valid severity score between 0 and 100.");
-                    return;
-                }
 
                 if (!dateValue || !timeSlot) {
                     alert("Please enter consultation date and time slot.");
@@ -1776,7 +2034,7 @@ async function loadPatientProfile() {
                         createdAt: serverTimestamp()
                     });
 
-                    // Also add to user's progress_history subcollection for real-time chart updates
+                    // Also add to user's progress_history subcollection for real-time card updates
                     const historyRef = collection(db, "users", patientId, "progress_history");
                     await addDoc(historyRef, {
                         severity: score,
@@ -1792,7 +2050,6 @@ async function loadPatientProfile() {
                     // Hide and Clear
                     if (findingsCard) findingsCard.classList.add('hidden');
                     if (findingsLog) findingsLog.value = '';
-                    if (severityScoreInput) severityScoreInput.value = '';
                     if (consultationDate) consultationDate.value = '';
                     if (consultationTime) consultationTime.value = '';
 
@@ -2132,7 +2389,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.body.style.overflow = ''; // Allow background scroll
         };
 
-        // Add click events
+        // click events
         reportButton.addEventListener('click', (e) => {
             e.preventDefault();
             openModal();

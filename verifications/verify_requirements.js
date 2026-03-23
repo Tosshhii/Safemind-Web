@@ -8,15 +8,18 @@ async function verify() {
     let errors = [];
     let warnings = [];
 
-    // Part 1: Dynamic Bar Chart Initialization
+    // Part 1: Swipeable Progress Cards Initialization
     if (!js.includes('const initialDataPoint = {')) {
         errors.push("Missing initialDataPoint creation in script.js");
     }
-    if (!js.includes('label: "AI Assessment Result"')) {
-        errors.push("Missing 'AI Assessment Result' label in initialDataPoint");
+    if (!js.includes('label: "AI Analysis #1"')) {
+        errors.push("Missing 'AI Analysis #1' label in initialDataPoint");
     }
     if (!js.includes('score: displayPercent')) {
         errors.push("Missing binding of score to displayPercent");
+    }
+    if (!html.includes('id="progress-cards-track"')) {
+        errors.push("Missing progress-cards-track in HTML");
     }
     if (!js.includes('collection(db, "users", patientId, "progress_history")')) {
         errors.push("Missing progress_history collection reference");
@@ -31,9 +34,6 @@ async function verify() {
     }
     if (!html.includes('id="findings-log"')) {
         errors.push("Missing findings-log input in HTML");
-    }
-    if (!html.includes('id="severity-score"')) {
-        errors.push("Missing severity-score input in HTML");
     }
     if (!html.includes('class="consultation-findings-card hidden"')) {
         warnings.push("Card might not be hidden by default (check classes)");
@@ -50,6 +50,9 @@ async function verify() {
     // Check save logic
     if (!js.includes('addDoc(historyRef, {')) {
         errors.push("Missing addDoc call to save findings");
+    }
+    if (!js.includes('const score = Number.isFinite(latestSeverityScore) ? latestSeverityScore : 0;')) {
+        errors.push("Missing automatic severity assignment from latestSeverityScore");
     }
     if (!js.includes('severity: score')) {
         errors.push("Missing severity field in addDoc payload");

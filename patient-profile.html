@@ -129,9 +129,9 @@
             </div>
 
             <div class="progress-actions">
-                <button id="add-findings-btn" class="btn" style="width: auto; margin-right: 10px;">Add Follow-up Findings</button>
-                <button id="finish-progress-btn" class="btn" style="width: auto; background-color: #666;">Finish Patient Progress</button>
-                <button id="reopen-case-btn" class="btn" style="width: auto; background-color: #3498db; display: none;">Reopen Case</button>
+                <button id="add-findings-btn" class="btn progress-action-btn progress-action-btn--add">Add Follow-up Findings</button>
+                <button id="finish-progress-btn" class="btn progress-action-btn progress-action-btn--finish">Finish Patient Progress</button>
+                <button id="reopen-case-btn" class="btn progress-action-btn progress-action-btn--reopen" style="display: none;">Reopen Case</button>
             </div>
 
             <!-- New Consultation Findings Card (Hidden by default) -->
@@ -155,20 +155,18 @@
                     <label for="findings-log">Findings Log:</label>
                     <textarea id="findings-log" rows="4" placeholder="Enter medical observations here..."></textarea>
                 </div>
-                <div class="input-group">
-                    <label for="severity-score">Current Severity Score (0-100%):</label>
-                    <input type="number" id="severity-score" min="0" max="100" placeholder="e.g. 65">
-                </div>
                 <div class="form-actions">
-                    <button id="save-entry-btn" class="btn" style="width: auto; margin-right: 10px;">Save Entry</button>
-                    <button id="cancel-entry-btn" class="btn" style="width: auto; background-color: #e74c3c;">Cancel</button>
+                    <button id="save-entry-btn" class="btn">Save Entry</button>
+                    <button id="cancel-entry-btn" class="btn">Cancel</button>
                 </div>
             </div>
 
-            <div class="progress-chart-container">
+            <div class="progress-cards-container">
                 <h3>Progress History</h3>
-                <div id="progress-chart" class="progress-bar-chart">
-                    <!-- Bars will be injected here -->
+                <div class="progress-cards-scroll" id="progress-cards-scroll">
+                    <div id="progress-cards-track" class="progress-cards-track">
+                        <!-- Swipeable cards will be injected here -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -206,8 +204,14 @@
 
                 <div class="report-section report-qa-section">
                     <h3>Patient's Answers</h3>
-                    <ul id="modal-qa-container" class="report-qa-list">
-                        </ul>
+                    <div class="report-qa-subsection">
+                        <h4>Rating Questions &amp; Answers</h4>
+                        <ul id="modal-rating-qa-container" class="report-qa-list"></ul>
+                    </div>
+                    <div class="report-qa-subsection">
+                        <h4>Sentence Questions &amp; Answers</h4>
+                        <ul id="modal-sentence-qa-container" class="report-qa-list"></ul>
+                    </div>
                 </div>
             </div>
         </div>
