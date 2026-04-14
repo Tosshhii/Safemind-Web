@@ -49,6 +49,40 @@ const firebaseConfig = {
   measurementId: "G-GMJ1ZME9PP"
 };
 
+// EmailJS configuration (set these with your EmailJS dashboard values)
+const EMAILJS_CONFIG = {
+    publicKey: 'jmItGItu0nibZ2mAX',
+    serviceId: 'service_q79gyg4',
+    templateId: 'template_o2b1yac',
+    declineTemplateId: 'template_achwxe5'
+};
+
+let emailJsModulePromise = null;
+
+function isEmailJsConfigured() {
+    return Boolean(
+        EMAILJS_CONFIG.publicKey.trim() &&
+        EMAILJS_CONFIG.serviceId.trim() &&
+        EMAILJS_CONFIG.templateId.trim()
+    );
+}
+
+async function getEmailJsClient() {
+    if (!isEmailJsConfigured()) {
+        throw new Error('EmailJS is not configured. Please set publicKey, serviceId, and templateId in EMAILJS_CONFIG.');
+    }
+
+    if (!emailJsModulePromise) {
+        emailJsModulePromise = import('https://cdn.jsdelivr.net/npm/@emailjs/browser@4/+esm')
+            .then((emailjs) => {
+                emailjs.init({ publicKey: EMAILJS_CONFIG.publicKey });
+                return emailjs;
+            });
+    }
+
+    return emailJsModulePromise;
+}
+
 // --- CORRECTED INITIALIZATION ORDER ---
 // 1. Initialize the app
 const app = initializeApp(firebaseConfig);
@@ -303,7 +337,7 @@ async function loadAppointments() {
 }
 // --- END UPDATED FUNCTION ---
 
-let pendingSortMode = 'oldest'; // 'oldest' | 'newest'
+let pendingSortMode = 'newest'; // 'oldest' | 'newest'
 
 // --- Pending consultation requests (Admin confirmation) ---
 // Supports BOTH layouts:
@@ -375,7 +409,7 @@ async function loadPendingRequests() {
             const req = item.data;
             const patientId = req.userId || req.userUID || null;
             let patientName = req.name || 'Unknown Patient';
-            let patientEmail = '';
+            let patientEmail = (req.email || req.userEmail || req.patientEmail || '').trim();
 
             if (patientId) {
                 try {
@@ -384,7 +418,7 @@ async function loadPendingRequests() {
                     if (uSnap.exists()) {
                         const userData = uSnap.data();
                         patientName = userData.name || patientName;
-                        patientEmail = userData.email || '';
+                        patientEmail = (userData.email || patientEmail || '').trim();
                     }
                 } catch (e) {
                     console.error('Failed to fetch patient data for pending request', e);
@@ -438,7 +472,9 @@ async function loadPendingRequests() {
             btn.addEventListener('click', async (e) => {
                 const item = e.target.closest('.pending-item');
                 const id = item.getAttribute('data-request-id');
-                await declineRequest(id);
+                const patientEmail = item.getAttribute('data-patient-email');
+                const patientName = item.getAttribute('data-patient-name');
+                await declineRequest(id, patientEmail, patientName);
             });
         });
 
@@ -471,18 +507,85 @@ async function loadPendingRequests() {
     }
 }
 
-// Mock email sending function
+// Send confirmation email using EmailJS
 async function sendConfirmationEmail(email, name) {
+    const recipientEmail = String(email || '').trim();
+    if (!recipientEmail) {
+        throw new Error('Missing recipient email.');
+    }
+
+    const recipientName = String(name || '').trim() || 'Patient';
+
+    // Basic format guard to avoid calling EmailJS with invalid input.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+        throw new Error(`Invalid recipient email: ${recipientEmail}`);
+    }
+
     const subject = "Consultation Confirmed - SafeMind";
-    const body = `Dear ${name},\n\nYour consultation request has been successfully confirmed and your consultation schedule is now booked.\n\nThank you,\nThe SafeMind Team`;
+    const body = `Dear ${recipientName},\n\nYour consultation request has been successfully confirmed and your consultation schedule is now booked.\n\nThank you,\nThe SafeMind Team`;
 
-    console.log(`[MOCK EMAIL SEND]`);
-    console.log(`To: ${email}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Body:\n${body}`);
+    const emailjs = await getEmailJsClient();
+    await emailjs.send(
+        EMAILJS_CONFIG.serviceId,
+        EMAILJS_CONFIG.templateId,
+        {
+            to_email: recipientEmail,
+            email: recipientEmail,
+            user_email: recipientEmail,
+            recipient_email: recipientEmail,
+            to_name: recipientName,
+            name: recipientName,
+            user_name: recipientName,
+            recipient_name: recipientName,
+            subject,
+            message: body
+        }
+    );
 
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    return true;
+}
+
+async function sendDeclineEmail(email, name, reason) {
+    const recipientEmail = String(email || '').trim();
+    if (!recipientEmail) {
+        throw new Error('Missing recipient email.');
+    }
+
+    const recipientName = String(name || '').trim() || 'Patient';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+        throw new Error(`Invalid recipient email: ${recipientEmail}`);
+    }
+
+    const safeReason = String(reason || '').trim();
+    const subject = 'Consultation Request Update - SafeMind';
+    const message = safeReason
+        ? `Your consultation request was declined at this time. Reason: ${safeReason}`
+        : 'Your consultation request was declined at this time.';
+
+    const emailjs = await getEmailJsClient();
+    const declineTemplateId = String(EMAILJS_CONFIG.declineTemplateId || '').trim();
+    if (!declineTemplateId) {
+        throw new Error('EmailJS declineTemplateId is not configured.');
+    }
+
+    await emailjs.send(
+        EMAILJS_CONFIG.serviceId,
+        declineTemplateId,
+        {
+            to_email: recipientEmail,
+            email: recipientEmail,
+            user_email: recipientEmail,
+            recipient_email: recipientEmail,
+            to_name: recipientName,
+            name: recipientName,
+            user_name: recipientName,
+            recipient_name: recipientName,
+            subject,
+            message,
+            decline_reason: safeReason || 'Not specified'
+        }
+    );
+
     return true;
 }
 
@@ -495,15 +598,9 @@ async function confirmRequest(requestId, patientEmail, patientName) {
         if (!reqSnap.exists()) return alert('Request not found.');
 
         const req = reqSnap.data();
-
-        // Send email first (mock)
-        if (patientEmail) {
-            await sendConfirmationEmail(patientEmail, patientName);
-            // Alert user feedback as requested
-            alert("Email Sent");
-        } else {
-            console.warn("No patient email available, skipping notification.");
-        }
+        const resolvedPatientName = String(
+            patientName || req.name || req.patientName || req.fullName || 'Patient'
+        ).trim() || 'Patient';
 
         // Add to bookedSlots with explicit strings
         await addDoc(collection(db, 'bookedSlots'), {
@@ -521,6 +618,18 @@ async function confirmRequest(requestId, patientEmail, patientName) {
             confirmedBy: auth.currentUser ? auth.currentUser.uid : null
         });
 
+        if (String(patientEmail || '').trim()) {
+            try {
+                await sendConfirmationEmail(patientEmail, resolvedPatientName);
+                alert('Confirmation email sent.');
+            } catch (emailError) {
+                console.error('Email send failed', emailError);
+                alert('Consultation confirmed, but email failed to send. Check EmailJS settings and console logs.');
+            }
+        } else {
+            console.warn('No patient email available, skipping notification.');
+        }
+
         loadPendingRequests(); // Reload list
 
         alert('Consultation confirmed and added to calendar.');
@@ -530,16 +639,53 @@ async function confirmRequest(requestId, patientEmail, patientName) {
     }
 }
 
-async function declineRequest(requestId) {
+async function declineRequest(requestId, patientEmail, patientName) {
     const reason = prompt('Optional: enter a reason for declining (or leave empty):');
     try {
         const reqRef = doc(db, 'consultationRequests', requestId);
+        const reqSnap = await getDoc(reqRef);
+        if (!reqSnap.exists()) return alert('Request not found.');
+        const req = reqSnap.data();
+
+        let resolvedPatientName = String(
+            patientName || req.name || req.patientName || req.fullName || 'Patient'
+        ).trim() || 'Patient';
+        let resolvedPatientEmail = String(
+            patientEmail || req.email || req.userEmail || req.patientEmail || ''
+        ).trim();
+
+        if (!resolvedPatientEmail && (req.userId || req.userUID)) {
+            try {
+                const userRef = doc(db, 'users', req.userId || req.userUID);
+                const userSnap = await getDoc(userRef);
+                if (userSnap.exists()) {
+                    const userData = userSnap.data();
+                    resolvedPatientName = String(userData.name || resolvedPatientName).trim() || 'Patient';
+                    resolvedPatientEmail = String(userData.email || '').trim();
+                }
+            } catch (lookupError) {
+                console.error('Failed to fetch user for decline email', lookupError);
+            }
+        }
+
         await updateDoc(reqRef, {
             status: 'declined',
             declinedAt: serverTimestamp(),
             declinedBy: auth.currentUser ? auth.currentUser.uid : null,
             declineReason: reason || ''
         });
+
+        if (resolvedPatientEmail) {
+            try {
+                await sendDeclineEmail(resolvedPatientEmail, resolvedPatientName, reason);
+                alert('Decline email sent.');
+            } catch (emailError) {
+                console.error('Decline email send failed', emailError);
+                alert('Request declined, but decline email failed to send. Check EmailJS settings and console logs.');
+            }
+        } else {
+            console.warn('No patient email available, skipping decline notification.');
+        }
 
         loadPendingRequests();
         alert('Consultation request declined.');
@@ -1061,6 +1207,9 @@ async function initializeCalendar() {
     const calendarBody = document.getElementById('calendar-body');
     if (!calendarBody) return;
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     // 1. Render the background grid first
     renderWeeklyCalendar(currentViewDate);
 
@@ -1129,6 +1278,15 @@ async function initializeCalendar() {
                 return;
             }
 
+            let appointmentStatus = 'scheduled';
+            if (apptDate.getTime() === today.getTime()) {
+                appointmentStatus = 'today';
+            } else if (apptDate < today) {
+                appointmentStatus = 'finished';
+            } else {
+                appointmentStatus = 'future';
+            }
+
             // --- **** NEW: Fetch Patient Name **** ---
             let patientName = "Unknown Patient";
             if (patientId) {
@@ -1155,7 +1313,7 @@ async function initializeCalendar() {
             
             // Create the inner link (use the new patientName)
             apptElement.innerHTML = `
-                <a href="patient-profile.html?id=${encodeURIComponent(patientId)}" class="patient-appointment">
+                <a href="patient-profile.html?id=${encodeURIComponent(patientId)}" class="patient-appointment patient-appointment--${appointmentStatus}">
                     ${patientName}
                     <span class="appt-time">${appt.time}</span>
                 </a>
@@ -2340,9 +2498,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const pendingSortSelect = document.getElementById('pending-sort');
     if (pendingSortSelect) {
-        pendingSortMode = pendingSortSelect.value || 'oldest';
+        pendingSortMode = pendingSortSelect.value || 'newest';
         pendingSortSelect.addEventListener('change', () => {
-            pendingSortMode = pendingSortSelect.value || 'oldest';
+            pendingSortMode = pendingSortSelect.value || 'newest';
             loadPendingRequests();
         });
     }
