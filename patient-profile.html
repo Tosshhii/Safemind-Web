@@ -164,10 +164,24 @@
 
             <div class="progress-cards-container">
                 <h3>Progress History</h3>
-                <div class="progress-cards-scroll" id="progress-cards-scroll">
-                    <div id="progress-cards-track" class="progress-cards-track">
-                        <!-- Swipeable cards will be injected here -->
-                    </div>
+                <div class="progress-table-wrapper" id="progress-cards-scroll">
+                    <table class="progress-history-table">
+                        <thead>
+                            <tr>
+                                <th>Report</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Notes</th>
+                                <th>Severity</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="progress-cards-track">
+                            <tr>
+                                <td colspan="6" class="progress-card-empty">Loading reports...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

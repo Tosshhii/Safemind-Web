@@ -1438,6 +1438,35 @@ function toJsDate(value) {
     if (!value) return null;
     if (value.toDate) return value.toDate();
     if (value instanceof Date) return value;
+
+    if (typeof value === 'string') {
+        const raw = value.trim();
+
+        // Supports values like "2025-11-17T16:34:10.597002" (microseconds, no timezone).
+        const microsecondIsoMatch = raw.match(
+            /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?$/
+        );
+
+        if (microsecondIsoMatch) {
+            const [, year, month, day, hour, minute, second, fraction = '0'] = microsecondIsoMatch;
+            const milliseconds = Number(fraction.slice(0, 3).padEnd(3, '0'));
+            // API timestamps in this format are interpreted as UTC.
+            // Example: "2026-04-24T06:18:29.326181" => 06:18 UTC.
+            return new Date(Date.UTC(
+                Number(year),
+                Number(month) - 1,
+                Number(day),
+                Number(hour),
+                Number(minute),
+                Number(second),
+                milliseconds
+            ));
+        }
+
+        const parsedString = new Date(raw);
+        return Number.isNaN(parsedString.getTime()) ? null : parsedString;
+    }
+
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
@@ -1450,6 +1479,64 @@ function formatDisplayDate(value) {
         day: 'numeric',
         year: 'numeric'
     });
+}
+
+function formatDisplayTime(value) {
+    const date = toJsDate(value);
+    if (!date) return '';
+    return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit'
+    });
+}
+
+function toLocalInputDate(value) {
+    const date = toJsDate(value);
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function parseInputDate(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return null;
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+}
+
+function isDateBefore(candidateDate, minimumDate) {
+    const candidate = parseInputDate(candidateDate);
+    const minimum = parseInputDate(minimumDate);
+    if (!candidate || !minimum) return false;
+    return candidate.getTime() < minimum.getTime();
+}
+
+function toDdMmYyyy(inputDate) {
+    const parsed = parseInputDate(inputDate);
+    if (!parsed) return '';
+    const dd = String(parsed.getDate()).padStart(2, '0');
+    const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+    const yyyy = parsed.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+}
+
+function ddMmYyyyToInputDate(value) {
+    if (typeof value !== 'string') return '';
+    const parts = value.split('/');
+    if (parts.length !== 3) return '';
+    const [day, month, year] = parts;
+    if (!day || !month || !year) return '';
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
+function normalizeTimeSlot(value) {
+    if (!value || typeof value !== 'string') return '';
+    return value
+        .toLowerCase()
+    .replace(/[\u2012\u2013\u2014\u2015]/g, '-')
+    .replace(/\s+/g, '')
+    .replace(/(am|pm)/g, '');
 }
 
 function escapeHtml(text) {
@@ -1558,85 +1645,82 @@ function renderProgressCards(cardsTrack, cardsData, handlers = {}) {
     cardsTrack.innerHTML = '';
 
     if (!Array.isArray(cardsData) || cardsData.length === 0) {
-        cardsTrack.innerHTML = '<p class="progress-card-empty">No reports available yet.</p>';
+        cardsTrack.innerHTML = '<tr><td colspan="6" class="progress-card-empty">No reports available yet.</td></tr>';
         return;
     }
 
     cardsData.forEach((item, index) => {
-        const card = document.createElement('article');
-        card.className = 'progress-card';
-        card.dataset.cardIndex = String(index);
+        const row = document.createElement('tr');
+        row.className = 'progress-history-row';
+        row.dataset.rowIndex = String(index);
         const cardType = item.type || (index === 0 ? 'initial' : 'followup');
 
         const severityValue = Number(item.score);
         const scoreText = Number.isFinite(severityValue) ? `${Math.round(severityValue)}%` : '—';
         const descriptionText = item.notes || item.summary || 'No notes available.';
         const canExpandFullReport = cardType === 'initial' && item.fullReport;
-        const followUpActionsSection = cardType === 'followup' && item.id
-            ? `
-                <div class="progress-card-admin-actions">
-                    <button type="button" class="progress-card-admin-btn progress-card-admin-btn--edit" data-action="edit-followup">Edit</button>
-                    <button type="button" class="progress-card-admin-btn progress-card-admin-btn--delete" data-action="delete-followup">Delete</button>
-                </div>
-            `
-            : '';
+        const reportLabel = item.label || `Report ${index + 1}`;
+        const resolvedTimeText = cardType === 'initial'
+            ? (formatDisplayTime(item.timestamp) || item.consultationTimeSlot || 'Initial AI Assessment')
+            : (item.consultationTimeSlot || '—');
 
-        const fullReportSection = canExpandFullReport
-            ? `
-                <div class="progress-card-expand-hint">Click card to ${item.expanded ? 'collapse' : 'expand'} full report</div>
-                <div class="progress-card-full-report hidden">
-                    ${buildProgressFullReportHtml(item.fullReport)}
-                </div>
-            `
-            : '';
+        let actionsSection = '';
+        if (canExpandFullReport) {
+            actionsSection += '<button type="button" class="progress-table-btn progress-table-btn--view" data-action="toggle-report">View Full Report</button>';
+        }
+        if (cardType === 'followup' && item.id) {
+            actionsSection += `
+                <button type="button" class="progress-table-btn progress-table-btn--edit" data-action="edit-followup">Edit</button>
+                <button type="button" class="progress-table-btn progress-table-btn--delete" data-action="delete-followup">Delete</button>
+            `;
+        }
 
-        card.innerHTML = `
-            <div class="progress-card-image progress-card-image--${escapeHtml(cardType)}">
-                <span class="progress-card-status progress-card-status--${escapeHtml(cardType)}">${escapeHtml(item.label || `Report ${index + 1}`)}</span>
-            </div>
-            <div class="progress-card-content">
-                <span class="progress-card-title">${escapeHtml(item.label || `Report ${index + 1}`)}</span>
-                <p class="progress-card-desc">
-                    <span class="progress-card-desc-line"><strong>Date:</strong> ${escapeHtml(item.consultationDate || formatDisplayDate(item.timestamp))}</span>
-                    <span class="progress-card-desc-line"><strong>Time:</strong> ${escapeHtml(item.consultationTimeSlot || 'Initial AI Assessment')}</span>
-                    <span class="progress-card-desc-line"><strong>Notes:</strong> ${escapeHtml(descriptionText)}</span>
-                </p>
-                <div class="progress-card-action" role="note" aria-label="severity">
-                    Severity: ${escapeHtml(scoreText)}
-                    <span aria-hidden="true">→</span>
-                </div>
-                ${followUpActionsSection}
-                ${fullReportSection}
-            </div>
+        row.innerHTML = `
+            <td>
+                <span class="progress-table-status progress-table-status--${escapeHtml(cardType)}">${escapeHtml(reportLabel)}</span>
+            </td>
+            <td>${escapeHtml(item.consultationDate || formatDisplayDate(item.timestamp))}</td>
+            <td>${escapeHtml(resolvedTimeText)}</td>
+            <td class="progress-notes-cell">${escapeHtml(descriptionText)}</td>
+            <td>
+                <span class="progress-severity-pill">${escapeHtml(scoreText)}</span>
+            </td>
+            <td>
+                <div class="progress-table-actions">${actionsSection || '<span class="progress-table-no-action">-</span>'}</div>
+            </td>
         `;
 
+        cardsTrack.appendChild(row);
+
+        let detailsRow = null;
         if (canExpandFullReport) {
-            card.classList.add('progress-card-clickable');
-            card.setAttribute('role', 'button');
-            card.setAttribute('tabindex', '0');
-            const toggleExpanded = () => {
-                const details = card.querySelector('.progress-card-full-report');
-                if (!details) return;
-                details.classList.toggle('hidden');
-                card.classList.toggle('progress-card-expanded');
-            };
-            card.addEventListener('click', toggleExpanded);
-            card.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    toggleExpanded();
-                }
+            detailsRow = document.createElement('tr');
+            detailsRow.className = 'progress-history-details-row hidden';
+            detailsRow.innerHTML = `
+                <td colspan="6">
+                    <div class="progress-card-full-report">
+                        ${buildProgressFullReportHtml(item.fullReport)}
+                    </div>
+                </td>
+            `;
+            cardsTrack.appendChild(detailsRow);
+        }
+
+        const viewBtn = row.querySelector('[data-action="toggle-report"]');
+        if (viewBtn && detailsRow) {
+            viewBtn.addEventListener('click', () => {
+                const isHidden = detailsRow.classList.toggle('hidden');
+                viewBtn.textContent = isHidden ? 'View Full Report' : 'Hide Full Report';
             });
         }
 
         if (cardType === 'followup' && item.id) {
-            const editBtn = card.querySelector('[data-action="edit-followup"]');
-            const deleteBtn = card.querySelector('[data-action="delete-followup"]');
+            const editBtn = row.querySelector('[data-action="edit-followup"]');
+            const deleteBtn = row.querySelector('[data-action="delete-followup"]');
 
             if (editBtn && typeof onEditFollowUp === 'function') {
                 editBtn.addEventListener('click', (event) => {
                     event.preventDefault();
-                    event.stopPropagation();
                     onEditFollowUp(item);
                 });
             }
@@ -1644,36 +1728,16 @@ function renderProgressCards(cardsTrack, cardsData, handlers = {}) {
             if (deleteBtn && typeof onDeleteFollowUp === 'function') {
                 deleteBtn.addEventListener('click', (event) => {
                     event.preventDefault();
-                    event.stopPropagation();
                     onDeleteFollowUp(item);
                 });
             }
         }
-
-        cardsTrack.appendChild(card);
     });
 }
 
 function updateFocusedCard(cardsScroll, cardsTrack) {
     if (!cardsScroll || !cardsTrack) return;
-    const cards = cardsTrack.querySelectorAll('.progress-card');
-    if (cards.length === 0) return;
-
-    const centerX = cardsScroll.scrollLeft + (cardsScroll.clientWidth / 2);
-    let nearestCard = null;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-
-    cards.forEach((card) => {
-        const cardCenter = card.offsetLeft + (card.offsetWidth / 2);
-        const distance = Math.abs(cardCenter - centerX);
-        if (distance < nearestDistance) {
-            nearestDistance = distance;
-            nearestCard = card;
-        }
-    });
-
-    cards.forEach((card) => card.classList.remove('progress-card-focus'));
-    if (nearestCard) nearestCard.classList.add('progress-card-focus');
+    // Retained for backward compatibility after moving from cards to table layout.
 }
 // --- End Helper Functions ---
 
@@ -1765,10 +1829,66 @@ async function loadPatientProfile() {
     const consultationTime = document.getElementById('consultation-time');
     const reopenCaseBtn = document.getElementById('reopen-case-btn');
     let latestSeverityScore = 0;
+    let firstAnalysisDateIso = '';
+    let followUpEntriesCount = 0;
+    let firstLockedConsultationSlot = null;
+
+    const validTimeSlots = ["8:00-10:00", "10:00-12:00", "2:00-4:00", "4:00-6:00"];
+
+    const isSlotInUse = async (dateValue, timeSlot) => {
+        const slotDate = toDdMmYyyy(dateValue);
+        if (!slotDate) return true;
+
+        const bookedSlotQuery = query(
+            collection(db, 'bookedSlots'),
+            where('status', '==', 'confirmed'),
+            where('date', '==', slotDate)
+        );
+        const requestSlotQuery = query(
+            collection(db, 'consultationRequests'),
+            where('status', '==', 'confirmed'),
+            where('date', '==', slotDate)
+        );
+
+        const [bookedSlotSnapshot, requestSlotSnapshot] = await Promise.all([
+            getDocs(bookedSlotQuery),
+            getDocs(requestSlotQuery)
+        ]);
+
+        const allSlots = [
+            ...bookedSlotSnapshot.docs,
+            ...requestSlotSnapshot.docs
+        ];
+
+        if (allSlots.length === 0) return false;
+
+        const normalizedSelectedSlot = normalizeTimeSlot(timeSlot);
+        return allSlots.some((slotDoc) => {
+            const slotData = slotDoc.data();
+            return normalizeTimeSlot(slotData.time) === normalizedSelectedSlot;
+        });
+    };
+
+    const applyFollowUpSchedulingMode = () => {
+        const isFirstFollowUp = followUpEntriesCount === 0;
+        const hasLockedSlot = Boolean(firstLockedConsultationSlot);
+
+        if (!consultationDate || !consultationTime) return;
+
+        if (isFirstFollowUp && hasLockedSlot) {
+            consultationDate.value = firstLockedConsultationSlot.dateInput;
+            consultationTime.value = firstLockedConsultationSlot.timeSlot;
+            consultationDate.disabled = true;
+            consultationTime.disabled = true;
+        } else {
+            consultationDate.disabled = false;
+            consultationTime.disabled = false;
+        }
+    };
 
     // Add loading state to cards
     if (progressCardsTrack) {
-        progressCardsTrack.innerHTML = '<p style="padding: 10px; color: #666;">Loading reports...</p>';
+        progressCardsTrack.innerHTML = '<tr><td colspan="6" class="progress-card-empty">Loading reports...</td></tr>';
     }
 
     // --- Get all NEW modal elements ---
@@ -1871,23 +1991,93 @@ async function loadPatientProfile() {
             if (nameElement) nameElement.textContent = "Patient Not Found";
         }
 
-        // --- FETCH 2: Get Latest Prediction from 'api_predictions' ---
+        const lockedSlotQueries = [
+            query(
+                collection(db, 'bookedSlots'),
+                where('userId', '==', patientId),
+                where('status', '==', 'confirmed')
+            ),
+            query(
+                collection(db, 'bookedSlots'),
+                where('userUID', '==', patientId),
+                where('status', '==', 'confirmed')
+            ),
+            query(
+                collection(db, 'consultationRequests'),
+                where('userId', '==', patientId),
+                where('status', '==', 'confirmed')
+            ),
+            query(
+                collection(db, 'consultationRequests'),
+                where('userUID', '==', patientId),
+                where('status', '==', 'confirmed')
+            )
+        ];
+
+        const lockedSlotSnapshots = await Promise.all(lockedSlotQueries.map((lockedQuery) => getDocs(lockedQuery)));
+        const lockedSlotDocs = lockedSlotSnapshots.flatMap((snapshot) => snapshot.docs);
+
+        if (lockedSlotDocs.length > 0) {
+            const normalizedSlots = lockedSlotDocs
+                .map((slotDoc) => {
+                    const slotData = slotDoc.data();
+                    const inputDate = ddMmYyyyToInputDate(slotData.date);
+                    const normalizedSlot = validTimeSlots.find(
+                        (slot) => normalizeTimeSlot(slot) === normalizeTimeSlot(slotData.time)
+                    ) || '';
+                    const sortDate = parseDateTime(slotData.date, slotData.time);
+                    return {
+                        dateInput: inputDate,
+                        timeSlot: normalizedSlot,
+                        sortDate
+                    };
+                })
+                .filter((entry) => entry.dateInput && entry.timeSlot)
+                .filter((entry, index, entries) => {
+                    const key = `${entry.dateInput}|${entry.timeSlot}`;
+                    return entries.findIndex((candidate) => `${candidate.dateInput}|${candidate.timeSlot}` === key) === index;
+                })
+                .sort((a, b) => a.sortDate - b.sortDate);
+
+            if (normalizedSlots.length > 0) {
+                firstLockedConsultationSlot = {
+                    dateInput: normalizedSlots[0].dateInput,
+                    timeSlot: normalizedSlots[0].timeSlot
+                };
+            }
+        }
+
+        // --- FETCH 2: Get all predictions from 'api_predictions' ---
         const predictionsRef = collectionGroup(db, "api_predictions");
-        const q = query(
+
+        const predictionsQuery = query(
             predictionsRef,
             where("userId", "==", patientId),    // Find reports for this user
-            orderBy("timestamp", "desc"), // Get the most recent one
-            limit(1)                      // Only get one
+            orderBy("timestamp", "asc")
         );
 
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await getDocs(predictionsQuery);
 
         if (!querySnapshot.empty) {
-            const predictionData = querySnapshot.docs[0].data();
+            const predictionDataList = querySnapshot.docs.map((predictionDoc) => predictionDoc.data());
+            const latestPredictionData = predictionDataList[predictionDataList.length - 1];
+            const firstPredictionData = predictionDataList[0];
+
+            firstAnalysisDateIso = toLocalInputDate(firstPredictionData.timestamp);
+            if (firstAnalysisDateIso && consultationDate) {
+                consultationDate.min = firstAnalysisDateIso;
+            }
+
+            if (!firstAnalysisDateIso) {
+                firstAnalysisDateIso = toLocalInputDate(latestPredictionData.timestamp);
+                if (firstAnalysisDateIso && consultationDate) {
+                    consultationDate.min = firstAnalysisDateIso;
+                }
+            }
             
             // --- UPDATED Logic for severity and gauge ---
             // 1. Get raw numeric score (e.g., 1.6, 2.8)
-            let rawScore = parseFloat(predictionData.severity_numeric);
+            let rawScore = parseFloat(latestPredictionData.severity_numeric);
             if (isNaN(rawScore)) rawScore = 1.0;
 
             // 2. Convert Scale: (1.0 - 3.0) to (0% - 100%)
@@ -1898,8 +2088,8 @@ async function loadPatientProfile() {
             calculatedPercent = Math.max(0, Math.min(100, calculatedPercent));
 
             const displayPercent = Math.round(calculatedPercent);
-            const severityText = predictionData.severity || 'unknown';
-            const parsedQa = parsePredictionQa(predictionData);
+            const severityText = latestPredictionData.severity || 'unknown';
+            const parsedQa = parsePredictionQa(latestPredictionData);
             latestSeverityScore = displayPercent;
             
             // --- Populate main page ---
@@ -1928,7 +2118,6 @@ async function loadPatientProfile() {
                     const existingNotes = followUpItem.notes || '';
                     const existingDate = followUpItem.consultationDate || '';
                     const existingTimeSlot = followUpItem.consultationTimeSlot || '8:00-10:00';
-                    const validTimeSlots = ["8:00-10:00", "10:00-12:00", "2:00-4:00", "4:00-6:00"];
 
                     const updatedNotes = prompt('Edit findings notes:', existingNotes);
                     if (updatedNotes === null) return;
@@ -1937,6 +2126,10 @@ async function loadPatientProfile() {
                     if (updatedDate === null) return;
                     if (!/^\d{4}-\d{2}-\d{2}$/.test(updatedDate)) {
                         alert('Invalid date format. Please use YYYY-MM-DD.');
+                        return;
+                    }
+                    if (firstAnalysisDateIso && isDateBefore(updatedDate, firstAnalysisDateIso)) {
+                        alert(`Consultation date cannot be before the first AI analysis date (${firstAnalysisDateIso}).`);
                         return;
                     }
 
@@ -1989,25 +2182,34 @@ async function loadPatientProfile() {
                     }
                 };
 
-                const initialDataPoint = {
-                    label: "AI Analysis #1",
-                    score: displayPercent,
-                    type: 'initial',
-                    timestamp: predictionData.timestamp || new Date(),
-                    consultationDate: formatDisplayDate(predictionData.timestamp || new Date()),
-                    consultationTimeSlot: "Initial AI Assessment",
-                    notes: predictionData.recommendation || "Initial AI analysis from SafeMind.",
-                    summary: `Severity classification: ${severityText}`,
-                    fullReport: {
-                        ...patientReportSnapshot,
-                        severityText,
-                        severityPercent: displayPercent,
-                        recommendation: predictionData.recommendation || "No recommendation provided.",
-                        qa: parsedQa
-                    }
-                };
+                const aiAnalysisData = predictionDataList.map((analysisItem, analysisIndex) => {
+                    let analysisRawScore = parseFloat(analysisItem.severity_numeric);
+                    if (isNaN(analysisRawScore)) analysisRawScore = 1.0;
+                    let analysisPercent = ((analysisRawScore - 1.0) / 2.0) * 100;
+                    analysisPercent = Math.max(0, Math.min(100, analysisPercent));
+                    const roundedPercent = Math.round(analysisPercent);
+                    const analysisSeverityText = analysisItem.severity || 'unknown';
 
-                let allProgressData = [initialDataPoint];
+                    return {
+                        label: `AI Analysis #${analysisIndex + 1}`,
+                        score: roundedPercent,
+                        type: 'initial',
+                        timestamp: analysisItem.timestamp || new Date(),
+                        consultationDate: formatDisplayDate(analysisItem.timestamp || new Date()),
+                        consultationTimeSlot: 'Initial AI Assessment',
+                        notes: analysisItem.recommendation || 'Initial AI analysis from SafeMind.',
+                        summary: `Severity classification: ${analysisSeverityText}`,
+                        fullReport: {
+                            ...patientReportSnapshot,
+                            severityText: analysisSeverityText,
+                            severityPercent: roundedPercent,
+                            recommendation: analysisItem.recommendation || 'No recommendation provided.',
+                            qa: parsePredictionQa(analysisItem)
+                        }
+                    };
+                });
+
+                let allProgressData = [...aiAnalysisData];
                 renderProgressCards(progressCardsTrack, allProgressData, {
                     onEditFollowUp,
                     onDeleteFollowUp
@@ -2020,11 +2222,11 @@ async function loadPatientProfile() {
                 const qHistory = query(historyRef, orderBy("timestamp", "asc"));
 
                 onSnapshot(qHistory, (snapshot) => {
+                    followUpEntriesCount = snapshot.docs.length;
                     const historyData = snapshot.docs.map((historyDoc, index) => {
                         const d = historyDoc.data();
                         const numericSeverity = Number(d.severity);
                         const resolvedSeverity = Number.isFinite(numericSeverity) ? numericSeverity : latestSeverityScore;
-                        latestSeverityScore = resolvedSeverity;
                         return {
                             id: historyDoc.id,
                             label: `Follow-up #${index + 1}`,
@@ -2037,7 +2239,13 @@ async function loadPatientProfile() {
                         };
                     });
 
-                    const combinedData = [initialDataPoint, ...historyData];
+                    const combinedData = [...aiAnalysisData, ...historyData].sort((a, b) => {
+                        const dateA = toJsDate(a.timestamp);
+                        const dateB = toJsDate(b.timestamp);
+                        const timeA = dateA ? dateA.getTime() : 0;
+                        const timeB = dateB ? dateB.getTime() : 0;
+                        return timeA - timeB;
+                    });
                     renderProgressCards(progressCardsTrack, combinedData, {
                         onEditFollowUp,
                         onDeleteFollowUp
@@ -2049,10 +2257,13 @@ async function loadPatientProfile() {
 
                     if (combinedData.length > 0) {
                         const latest = combinedData[combinedData.length - 1];
+                        latestSeverityScore = Number(latest.score) || latestSeverityScore;
                         if (progressSummary) {
                             progressSummary.textContent = `${Math.round(Number(latest.score) || 0)}% (${latest.label})`;
                         }
                     }
+
+                    applyFollowUpSchedulingMode();
                 }, (error) => {
                     console.error("Error listening to progress history:", error);
                 });
@@ -2068,7 +2279,7 @@ async function loadPatientProfile() {
             // --- Populate modal with analysis data ---
             if (modalSeverityText) modalSeverityText.textContent = severityText;
             if (modalSeverityPercent) modalSeverityPercent.textContent = displayPercent + '%';
-            if (modalRecommendation) modalRecommendation.textContent = predictionData.recommendation || "No recommendation provided.";
+            if (modalRecommendation) modalRecommendation.textContent = latestPredictionData.recommendation || "No recommendation provided.";
 
             
             // --- **** NEW ROBUST Q&A LOGIC (Universal Adapter) **** ---
@@ -2134,6 +2345,16 @@ async function loadPatientProfile() {
         // 1. Show Form
         if (addFindingsBtn && findingsCard) {
             addFindingsBtn.addEventListener('click', () => {
+                if (consultationDate && firstAnalysisDateIso) {
+                    consultationDate.min = firstAnalysisDateIso;
+                }
+
+                applyFollowUpSchedulingMode();
+
+                if (followUpEntriesCount === 0 && !firstLockedConsultationSlot) {
+                    alert('No locked consultation schedule found for this patient. Please select date and time manually.');
+                }
+
                 findingsCard.classList.remove('hidden');
                 // Scroll to form
                 findingsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2147,6 +2368,8 @@ async function loadPatientProfile() {
                 if (findingsLog) findingsLog.value = '';
                 if (consultationDate) consultationDate.value = '';
                 if (consultationTime) consultationTime.value = '';
+                if (consultationDate) consultationDate.disabled = false;
+                if (consultationTime) consultationTime.disabled = false;
             });
         }
 
@@ -2160,6 +2383,29 @@ async function loadPatientProfile() {
 
                 if (!dateValue || !timeSlot) {
                     alert("Please enter consultation date and time slot.");
+                    return;
+                }
+
+                const isFirstFollowUp = followUpEntriesCount === 0;
+                if (isFirstFollowUp && firstLockedConsultationSlot) {
+                    const dateMismatch = dateValue !== firstLockedConsultationSlot.dateInput;
+                    const timeMismatch = normalizeTimeSlot(timeSlot) !== normalizeTimeSlot(firstLockedConsultationSlot.timeSlot);
+                    if (dateMismatch || timeMismatch) {
+                        alert(`First follow-up must use the locked consultation schedule: ${firstLockedConsultationSlot.dateInput} (${firstLockedConsultationSlot.timeSlot}).`);
+                        return;
+                    }
+                }
+
+                if (!isFirstFollowUp) {
+                    const slotAlreadyUsed = await isSlotInUse(dateValue, timeSlot);
+                    if (slotAlreadyUsed) {
+                        alert('Selected consultation date and time slot is already occupied. Please choose a free consultation time.');
+                        return;
+                    }
+                }
+
+                if (firstAnalysisDateIso && isDateBefore(dateValue, firstAnalysisDateIso)) {
+                    alert(`Consultation date cannot be before the first AI analysis date (${firstAnalysisDateIso}).`);
                     return;
                 }
 
