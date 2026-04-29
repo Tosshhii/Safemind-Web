@@ -1512,6 +1512,21 @@ function isDateBefore(candidateDate, minimumDate) {
     return candidate.getTime() < minimum.getTime();
 }
 
+function getTodayInputDate() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function isDateAfter(candidateDate, maximumDate) {
+    const candidate = parseInputDate(candidateDate);
+    const maximum = parseInputDate(maximumDate);
+    if (!candidate || !maximum) return false;
+    return candidate.getTime() > maximum.getTime();
+}
+
 function toDdMmYyyy(inputDate) {
     const parsed = parseInputDate(inputDate);
     if (!parsed) return '';
@@ -1639,7 +1654,7 @@ function buildProgressFullReportHtml(fullReport) {
 }
 
 function renderProgressCards(cardsTrack, cardsData, handlers = {}) {
-    const { onEditFollowUp, onDeleteFollowUp } = handlers;
+    const { onEditFollowUp } = handlers;
     if (!cardsTrack) return;
 
     cardsTrack.innerHTML = '';
@@ -1671,7 +1686,6 @@ function renderProgressCards(cardsTrack, cardsData, handlers = {}) {
         if (cardType === 'followup' && item.id) {
             actionsSection += `
                 <button type="button" class="progress-table-btn progress-table-btn--edit" data-action="edit-followup">Edit</button>
-                <button type="button" class="progress-table-btn progress-table-btn--delete" data-action="delete-followup">Delete</button>
             `;
         }
 
@@ -1716,19 +1730,11 @@ function renderProgressCards(cardsTrack, cardsData, handlers = {}) {
 
         if (cardType === 'followup' && item.id) {
             const editBtn = row.querySelector('[data-action="edit-followup"]');
-            const deleteBtn = row.querySelector('[data-action="delete-followup"]');
 
             if (editBtn && typeof onEditFollowUp === 'function') {
                 editBtn.addEventListener('click', (event) => {
                     event.preventDefault();
                     onEditFollowUp(item);
-                });
-            }
-
-            if (deleteBtn && typeof onDeleteFollowUp === 'function') {
-                deleteBtn.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    onDeleteFollowUp(item);
                 });
             }
         }
@@ -1828,10 +1834,14 @@ async function loadPatientProfile() {
     const consultationDate = document.getElementById('consultation-date');
     const consultationTime = document.getElementById('consultation-time');
     const reopenCaseBtn = document.getElementById('reopen-case-btn');
+    const findingsModeLabel = document.getElementById('findings-mode-label');
+    const findingsCardTitle = findingsCard ? findingsCard.querySelector('h3') : null;
+    const saveEntryBtnText = saveEntryBtn ? saveEntryBtn.textContent : 'Save Entry';
     let latestSeverityScore = 0;
     let firstAnalysisDateIso = '';
     let followUpEntriesCount = 0;
-    let firstLockedConsultationSlot = null;
+    const todayInputDate = getTodayInputDate();
+    let activeFollowUpEdit = null;
 
     const validTimeSlots = ["8:00-10:00", "10:00-12:00", "2:00-4:00", "4:00-6:00"];
 
@@ -1870,19 +1880,60 @@ async function loadPatientProfile() {
     };
 
     const applyFollowUpSchedulingMode = () => {
-        const isFirstFollowUp = followUpEntriesCount === 0;
-        const hasLockedSlot = Boolean(firstLockedConsultationSlot);
-
         if (!consultationDate || !consultationTime) return;
 
-        if (isFirstFollowUp && hasLockedSlot) {
-            consultationDate.value = firstLockedConsultationSlot.dateInput;
-            consultationTime.value = firstLockedConsultationSlot.timeSlot;
-            consultationDate.disabled = true;
-            consultationTime.disabled = true;
+        consultationDate.min = todayInputDate;
+        consultationDate.disabled = false;
+        consultationTime.disabled = false;
+    };
+
+    const clearFindingsForm = () => {
+        if (findingsLog) findingsLog.value = '';
+        if (consultationDate) consultationDate.value = '';
+        if (consultationTime) consultationTime.value = '';
+    };
+
+    const setFindingsFormMode = (mode, followUpItem = null) => {
+        const isEditMode = mode === 'edit';
+        activeFollowUpEdit = isEditMode ? followUpItem : null;
+
+        if (findingsCardTitle) {
+            findingsCardTitle.textContent = isEditMode ? 'Edit Consultation Findings' : 'Record Consultation Findings';
+        }
+
+        if (saveEntryBtn) {
+            saveEntryBtn.textContent = isEditMode ? 'Save Changes' : saveEntryBtnText;
+        }
+
+        if (!findingsModeLabel) return;
+
+        if (isEditMode && followUpItem) {
+            findingsModeLabel.textContent = `Editing ${followUpItem.label || 'follow-up entry'}`;
+            findingsModeLabel.classList.remove('hidden');
         } else {
-            consultationDate.disabled = false;
-            consultationTime.disabled = false;
+            findingsModeLabel.textContent = '';
+            findingsModeLabel.classList.add('hidden');
+        }
+    };
+
+    const openFindingsForm = (mode, followUpItem = null) => {
+        setFindingsFormMode(mode, followUpItem);
+        applyFollowUpSchedulingMode();
+
+        if (mode === 'edit' && followUpItem) {
+            if (findingsLog) findingsLog.value = followUpItem.notes || '';
+            if (consultationDate) consultationDate.value = followUpItem.consultationDate || '';
+            if (consultationTime) consultationTime.value = followUpItem.consultationTimeSlot || '';
+            if (consultationDate) consultationDate.min = '';
+        } else {
+            clearFindingsForm();
+            if (consultationDate) consultationDate.min = todayInputDate;
+            if (consultationTime) consultationTime.disabled = false;
+        }
+
+        if (findingsCard) {
+            findingsCard.classList.remove('hidden');
+            findingsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     };
 
@@ -1991,62 +2042,6 @@ async function loadPatientProfile() {
             if (nameElement) nameElement.textContent = "Patient Not Found";
         }
 
-        const lockedSlotQueries = [
-            query(
-                collection(db, 'bookedSlots'),
-                where('userId', '==', patientId),
-                where('status', '==', 'confirmed')
-            ),
-            query(
-                collection(db, 'bookedSlots'),
-                where('userUID', '==', patientId),
-                where('status', '==', 'confirmed')
-            ),
-            query(
-                collection(db, 'consultationRequests'),
-                where('userId', '==', patientId),
-                where('status', '==', 'confirmed')
-            ),
-            query(
-                collection(db, 'consultationRequests'),
-                where('userUID', '==', patientId),
-                where('status', '==', 'confirmed')
-            )
-        ];
-
-        const lockedSlotSnapshots = await Promise.all(lockedSlotQueries.map((lockedQuery) => getDocs(lockedQuery)));
-        const lockedSlotDocs = lockedSlotSnapshots.flatMap((snapshot) => snapshot.docs);
-
-        if (lockedSlotDocs.length > 0) {
-            const normalizedSlots = lockedSlotDocs
-                .map((slotDoc) => {
-                    const slotData = slotDoc.data();
-                    const inputDate = ddMmYyyyToInputDate(slotData.date);
-                    const normalizedSlot = validTimeSlots.find(
-                        (slot) => normalizeTimeSlot(slot) === normalizeTimeSlot(slotData.time)
-                    ) || '';
-                    const sortDate = parseDateTime(slotData.date, slotData.time);
-                    return {
-                        dateInput: inputDate,
-                        timeSlot: normalizedSlot,
-                        sortDate
-                    };
-                })
-                .filter((entry) => entry.dateInput && entry.timeSlot)
-                .filter((entry, index, entries) => {
-                    const key = `${entry.dateInput}|${entry.timeSlot}`;
-                    return entries.findIndex((candidate) => `${candidate.dateInput}|${candidate.timeSlot}` === key) === index;
-                })
-                .sort((a, b) => a.sortDate - b.sortDate);
-
-            if (normalizedSlots.length > 0) {
-                firstLockedConsultationSlot = {
-                    dateInput: normalizedSlots[0].dateInput,
-                    timeSlot: normalizedSlots[0].timeSlot
-                };
-            }
-        }
-
         // --- FETCH 2: Get all predictions from 'api_predictions' ---
         const predictionsRef = collectionGroup(db, "api_predictions");
 
@@ -2115,71 +2110,7 @@ async function loadPatientProfile() {
                 progressCardsTrack.innerHTML = '';
 
                 const onEditFollowUp = async (followUpItem) => {
-                    const existingNotes = followUpItem.notes || '';
-                    const existingDate = followUpItem.consultationDate || '';
-                    const existingTimeSlot = followUpItem.consultationTimeSlot || '8:00-10:00';
-
-                    const updatedNotes = prompt('Edit findings notes:', existingNotes);
-                    if (updatedNotes === null) return;
-
-                    const updatedDate = prompt('Edit consultation date (YYYY-MM-DD):', existingDate);
-                    if (updatedDate === null) return;
-                    if (!/^\d{4}-\d{2}-\d{2}$/.test(updatedDate)) {
-                        alert('Invalid date format. Please use YYYY-MM-DD.');
-                        return;
-                    }
-                    if (firstAnalysisDateIso && isDateBefore(updatedDate, firstAnalysisDateIso)) {
-                        alert(`Consultation date cannot be before the first AI analysis date (${firstAnalysisDateIso}).`);
-                        return;
-                    }
-
-                    const updatedTimeSlot = prompt(
-                        'Edit consultation time slot:\n8:00-10:00 | 10:00-12:00 | 2:00-4:00 | 4:00-6:00',
-                        existingTimeSlot
-                    );
-                    if (updatedTimeSlot === null) return;
-                    if (!validTimeSlots.includes(updatedTimeSlot)) {
-                        alert('Invalid time slot. Use one of: 8:00-10:00, 10:00-12:00, 2:00-4:00, 4:00-6:00');
-                        return;
-                    }
-
-                    try {
-                        const timeSlotMap = {
-                            "8:00-10:00": "08:00",
-                            "10:00-12:00": "10:00",
-                            "2:00-4:00": "14:00",
-                            "4:00-6:00": "16:00"
-                        };
-                        const startTime = timeSlotMap[updatedTimeSlot] || '08:00';
-                        const consultationDateTime = new Date(`${updatedDate}T${startTime}:00`);
-
-                        const historyDocRef = doc(db, 'users', patientId, 'progress_history', followUpItem.id);
-                        await updateDoc(historyDocRef, {
-                            notes: updatedNotes.trim(),
-                            consultationDate: updatedDate,
-                            consultationTimeSlot: updatedTimeSlot,
-                            timestamp: Timestamp.fromDate(consultationDateTime)
-                        });
-
-                        alert('Follow-up updated successfully.');
-                    } catch (error) {
-                        console.error('Error updating follow-up:', error);
-                        alert('Failed to update follow-up. See console for details.');
-                    }
-                };
-
-                const onDeleteFollowUp = async (followUpItem) => {
-                    const confirmed = confirm('Are you sure you want to delete this follow-up entry?');
-                    if (!confirmed) return;
-
-                    try {
-                        const historyDocRef = doc(db, 'users', patientId, 'progress_history', followUpItem.id);
-                        await deleteDoc(historyDocRef);
-                        alert('Follow-up deleted successfully.');
-                    } catch (error) {
-                        console.error('Error deleting follow-up:', error);
-                        alert('Failed to delete follow-up. See console for details.');
-                    }
+                    openFindingsForm('edit', followUpItem);
                 };
 
                 const aiAnalysisData = predictionDataList.map((analysisItem, analysisIndex) => {
@@ -2211,8 +2142,7 @@ async function loadPatientProfile() {
 
                 let allProgressData = [...aiAnalysisData];
                 renderProgressCards(progressCardsTrack, allProgressData, {
-                    onEditFollowUp,
-                    onDeleteFollowUp
+                    onEditFollowUp
                 });
                 if (progressCardsScroll) {
                     updateFocusedCard(progressCardsScroll, progressCardsTrack);
@@ -2247,8 +2177,7 @@ async function loadPatientProfile() {
                         return timeA - timeB;
                     });
                     renderProgressCards(progressCardsTrack, combinedData, {
-                        onEditFollowUp,
-                        onDeleteFollowUp
+                        onEditFollowUp
                     });
 
                     if (progressCardsScroll) {
@@ -2345,19 +2274,7 @@ async function loadPatientProfile() {
         // 1. Show Form
         if (addFindingsBtn && findingsCard) {
             addFindingsBtn.addEventListener('click', () => {
-                if (consultationDate && firstAnalysisDateIso) {
-                    consultationDate.min = firstAnalysisDateIso;
-                }
-
-                applyFollowUpSchedulingMode();
-
-                if (followUpEntriesCount === 0 && !firstLockedConsultationSlot) {
-                    alert('No locked consultation schedule found for this patient. Please select date and time manually.');
-                }
-
-                findingsCard.classList.remove('hidden');
-                // Scroll to form
-                findingsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                openFindingsForm('add');
             });
         }
 
@@ -2365,11 +2282,11 @@ async function loadPatientProfile() {
         if (cancelEntryBtn && findingsCard) {
             cancelEntryBtn.addEventListener('click', () => {
                 findingsCard.classList.add('hidden');
-                if (findingsLog) findingsLog.value = '';
-                if (consultationDate) consultationDate.value = '';
-                if (consultationTime) consultationTime.value = '';
+                clearFindingsForm();
+                setFindingsFormMode('add');
                 if (consultationDate) consultationDate.disabled = false;
                 if (consultationTime) consultationTime.disabled = false;
+                if (consultationDate) consultationDate.min = todayInputDate;
             });
         }
 
@@ -2380,32 +2297,21 @@ async function loadPatientProfile() {
                 const score = Number.isFinite(latestSeverityScore) ? latestSeverityScore : 0;
                 const dateValue = consultationDate ? consultationDate.value : '';
                 const timeSlot = consultationTime ? consultationTime.value : '';
+                const isEditingFollowUp = Boolean(activeFollowUpEdit && activeFollowUpEdit.id);
 
                 if (!dateValue || !timeSlot) {
                     alert("Please enter consultation date and time slot.");
                     return;
                 }
 
-                const isFirstFollowUp = followUpEntriesCount === 0;
-                if (isFirstFollowUp && firstLockedConsultationSlot) {
-                    const dateMismatch = dateValue !== firstLockedConsultationSlot.dateInput;
-                    const timeMismatch = normalizeTimeSlot(timeSlot) !== normalizeTimeSlot(firstLockedConsultationSlot.timeSlot);
-                    if (dateMismatch || timeMismatch) {
-                        alert(`First follow-up must use the locked consultation schedule: ${firstLockedConsultationSlot.dateInput} (${firstLockedConsultationSlot.timeSlot}).`);
-                        return;
-                    }
+                if (!isEditingFollowUp && isDateBefore(dateValue, todayInputDate)) {
+                    alert(`Consultation date cannot be before today (${todayInputDate}).`);
+                    return;
                 }
 
-                if (!isFirstFollowUp) {
-                    const slotAlreadyUsed = await isSlotInUse(dateValue, timeSlot);
-                    if (slotAlreadyUsed) {
-                        alert('Selected consultation date and time slot is already occupied. Please choose a free consultation time.');
-                        return;
-                    }
-                }
-
-                if (firstAnalysisDateIso && isDateBefore(dateValue, firstAnalysisDateIso)) {
-                    alert(`Consultation date cannot be before the first AI analysis date (${firstAnalysisDateIso}).`);
+                const slotAlreadyUsed = await isSlotInUse(dateValue, timeSlot);
+                if (!isEditingFollowUp && slotAlreadyUsed) {
+                    alert('Selected consultation date and time slot is already occupied. Please choose a free consultation time.');
                     return;
                 }
 
@@ -2425,37 +2331,53 @@ async function loadPatientProfile() {
                     const startTime = timeSlotMap[timeSlot] || "08:00";
                     const consultationDateTime = new Date(`${dateValue}T${startTime}:00`);
                     
-                    // Add to followUps collection in the main database
-                    const followUpsRef = collection(db, "followUps");
-                    await addDoc(followUpsRef, {
-                        userId: patientId,
-                        severity: score,
-                        notes: notes,
-                        consultationDate: dateValue,
-                        consultationTimeSlot: timeSlot,
-                        timestamp: Timestamp.fromDate(consultationDateTime),
-                        recordedBy: auth.currentUser ? auth.currentUser.uid : null,
-                        createdAt: serverTimestamp()
-                    });
+                    if (isEditingFollowUp) {
+                        const historyDocRef = doc(db, 'users', patientId, 'progress_history', activeFollowUpEdit.id);
+                        await updateDoc(historyDocRef, {
+                            severity: score,
+                            notes: notes,
+                            consultationDate: dateValue,
+                            consultationTimeSlot: timeSlot,
+                            timestamp: Timestamp.fromDate(consultationDateTime),
+                            recordedBy: auth.currentUser ? auth.currentUser.uid : null
+                        });
 
-                    // Also add to user's progress_history subcollection for real-time card updates
-                    const historyRef = collection(db, "users", patientId, "progress_history");
-                    await addDoc(historyRef, {
-                        severity: score,
-                        notes: notes,
-                        consultationDate: dateValue,
-                        consultationTimeSlot: timeSlot,
-                        timestamp: Timestamp.fromDate(consultationDateTime),
-                        recordedBy: auth.currentUser ? auth.currentUser.uid : null
-                    });
+                        alert('Follow-up updated successfully.');
+                    } else {
+                        // Add to followUps collection in the main database
+                        const followUpsRef = collection(db, "followUps");
+                        await addDoc(followUpsRef, {
+                            userId: patientId,
+                            severity: score,
+                            notes: notes,
+                            consultationDate: dateValue,
+                            consultationTimeSlot: timeSlot,
+                            timestamp: Timestamp.fromDate(consultationDateTime),
+                            recordedBy: auth.currentUser ? auth.currentUser.uid : null,
+                            createdAt: serverTimestamp()
+                        });
 
-                    alert("Findings recorded successfully!");
+                        // Also add to user's progress_history subcollection for real-time card updates
+                        const historyRef = collection(db, "users", patientId, "progress_history");
+                        await addDoc(historyRef, {
+                            severity: score,
+                            notes: notes,
+                            consultationDate: dateValue,
+                            consultationTimeSlot: timeSlot,
+                            timestamp: Timestamp.fromDate(consultationDateTime),
+                            recordedBy: auth.currentUser ? auth.currentUser.uid : null
+                        });
+
+                        alert("Findings recorded successfully!");
+                    }
 
                     // Hide and Clear
                     if (findingsCard) findingsCard.classList.add('hidden');
-                    if (findingsLog) findingsLog.value = '';
-                    if (consultationDate) consultationDate.value = '';
-                    if (consultationTime) consultationTime.value = '';
+                    clearFindingsForm();
+                    setFindingsFormMode('add');
+                    if (consultationDate) consultationDate.disabled = false;
+                    if (consultationTime) consultationTime.disabled = false;
+                    if (consultationDate) consultationDate.min = todayInputDate;
 
                 } catch (error) {
                     console.error("Error saving findings:", error);
